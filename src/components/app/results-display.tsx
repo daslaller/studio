@@ -1,12 +1,14 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, LiveDataPoint } from "@/lib/types";
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, LiveDataPoint, AiDeepDiveStep } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power, Package, ShieldAlert, BrainCircuit } from 'lucide-react';
 import React from "react";
 import LiveSimulationView from "./live-simulation-view";
 import { Button } from "../ui/button";
+import AiDeepDiveView from "./ai-deep-dive-view";
 
 interface ResultsDisplayProps {
   isLoading: boolean;
@@ -16,6 +18,9 @@ interface ResultsDisplayProps {
   liveData: LiveDataPoint[];
   formValues: any;
   onAiDeepDive: () => void;
+  isDeepDiveRunning: boolean;
+  deepDiveSteps: AiDeepDiveStep[];
+  currentDeepDiveStep: number;
 }
 
 const ResultMetric = ({ icon, label, value, unit, colorClass = 'text-primary' }: { icon: React.ElementType, label: string, value: string | number, unit: string, colorClass?: string }) => (
@@ -38,7 +43,21 @@ export default function ResultsDisplay({
   liveData,
   formValues,
   onAiDeepDive,
+  isDeepDiveRunning,
+  deepDiveSteps,
+  currentDeepDiveStep,
 }: ResultsDisplayProps) {
+
+  if (isDeepDiveRunning) {
+    return (
+        <AiDeepDiveView
+            steps={deepDiveSteps}
+            currentStepIndex={currentDeepDiveStep}
+            liveData={liveData}
+            initialFormValues={formValues}
+        />
+    )
+  }
 
   if (isLoading && liveData.length > 0) {
     return (
@@ -143,7 +162,7 @@ export default function ResultsDisplay({
             <div className="p-4 bg-white/5 rounded-lg">
               <p className="text-sm text-muted-foreground pt-2 italic"><strong className="text-foreground not-italic">AI Reasoning:</strong> {aiOptimizationSuggestions.reasoning}</p>
             </div>
-            <Button onClick={onAiDeepDive} disabled={isLoading} className="w-full bg-primary/80 hover:bg-primary">
+            <Button onClick={onAiDeepDive} disabled={isLoading || isDeepDiveRunning} className="w-full bg-primary/80 hover:bg-primary">
                 <BrainCircuit className="mr-2 h-5 w-5"/>
                 Start AI Deep Dive Analysis
             </Button>

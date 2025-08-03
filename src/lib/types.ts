@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export interface ManualSpecs {
@@ -81,4 +82,11 @@ export interface LiveDataPoint {
     powerLoss: number;
     progress: number;
     limitValue: number;
+}
+
+export interface AiDeepDiveStep {
+  title: string;
+  description: string;
+  simulationParams: any;
+  simulationResult: SimulationResult | null;
 }

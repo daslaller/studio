@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useTransition, useCallback } from 'react';
@@ -8,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
 import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction } from '@/app/actions';
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput } from '@/lib/types';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 
 const isMosfetType = (type: string) => {
@@ -69,6 +70,9 @@ export default function AmpereAnalyzer() {
   const [aiOptimizationSuggestions, setAiOptimizationSuggestions] = useState<AiOptimizationSuggestionsOutput | null>(null);
   const [datasheetFile, setDatasheetFile] = useState<File | null>(null);
   const [liveData, setLiveData] = useState<LiveDataPoint[]>([]);
+  const [isDeepDiveRunning, setIsDeepDiveRunning] = useState(false);
+  const [deepDiveSteps, setDeepDiveSteps] = useState<AiDeepDiveStep[]>([]);
+  const [currentDeepDiveStep, setCurrentDeepDiveStep] = useState(0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -267,6 +271,7 @@ export default function AmpereAnalyzer() {
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
+      setIsDeepDiveRunning(false);
       setSimulationResult(null);
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
@@ -318,6 +323,16 @@ export default function AmpereAnalyzer() {
     });
   };
 
+  const runDeepDiveSimulation = useCallback(async (
+      initialValues: FormValues,
+      newValues: Partial<FormValues>,
+      updateCallback: (data: LiveDataPoint[]) => void
+  ) => {
+      const combinedValues = { ...initialValues, ...newValues };
+      const simResult = await runSimulation(combinedValues, updateCallback);
+      return simResult;
+  }, [runSimulation]);
+
   const handleAiDeepDive = useCallback(async () => {
     if (!simulationResult || !aiOptimizationSuggestions) {
         toast({ variant: 'destructive', title: 'Error', description: 'Need initial results to run a deep dive.' });
@@ -325,6 +340,11 @@ export default function AmpereAnalyzer() {
     }
     
     startTransition(async () => {
+        setIsDeepDiveRunning(true);
+        setCurrentDeepDiveStep(0);
+        setDeepDiveSteps([]);
+        setLiveData([]);
+
         const values = form.getValues();
         const componentName = values.predefinedComponent
             ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
@@ -347,28 +367,82 @@ export default function AmpereAnalyzer() {
             maxTemperature: values.maxTemperature,
             coolingBudget: coolingBudgetVal,
             simulationResults: simulationSummary,
-            allCoolingMethods: JSON.stringify(coolingMethods),
+            allCoolingMethods: JSON.stringify(coolingMethods.map(c => ({name: c.name, value: c.value}))),
             initialSpecs: JSON.stringify(initialSpecs),
         };
 
-        toast({ title: "AI Deep Dive Started", description: "The AI is running an iterative analysis to find optimal settings..." });
+        toast({ title: "AI Deep Dive Started", description: "The AI is running an iterative analysis..." });
         
         const result = await runAiDeepDiveAction(deepDiveInput);
 
-        if (result.error) {
-            toast({ variant: 'destructive', title: 'AI Deep Dive Error', description: result.error });
-        } else if (result.data) {
-            toast({
-                title: "AI Deep Dive Complete",
-                description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A. ${result.data.reasoning}`,
-                duration: 9000,
-            });
-            form.setValue('coolingMethod', result.data.bestCoolingMethod);
-            form.setValue('switchingFrequency', result.data.optimalFrequency);
+        if (result.error || !result.data) {
+            toast({ variant: 'destructive', title: 'AI Deep Dive Error', description: result.error || "No data returned from AI." });
+            setIsDeepDiveRunning(false);
+            return;
+        } 
+        
+        // Prepare simulation steps
+        const simulationSteps: AiDeepDiveStep[] = [
+            {
+                title: "Analyzing Initial Failure",
+                description: "The AI is examining the original simulation data to identify the primary bottleneck.",
+                simulationResult: simulationResult,
+                simulationParams: {},
+            },
+            {
+                title: "Testing Optimal Frequency",
+                description: `The AI is re-running the simulation with a suggested optimal frequency of ${result.data.optimalFrequency} kHz to reduce switching losses.`,
+                simulationResult: null,
+                simulationParams: { switchingFrequency: result.data.optimalFrequency },
+            },
+            {
+                title: "Testing Upgraded Cooler",
+                description: `The AI is now applying the '${result.data.bestCoolingMethod}' and re-evaluating performance with the new thermal solution.`,
+                simulationResult: null,
+                simulationParams: { coolingMethod: result.data.bestCoolingMethod, switchingFrequency: result.data.optimalFrequency },
+            },
+            {
+                title: "Final Recommendation",
+                description: result.data.reasoning,
+                simulationResult: null,
+                simulationParams: {},
+            }
+        ];
+        
+        setDeepDiveSteps(simulationSteps);
+
+        // Run through steps
+        for(let i = 0; i < simulationSteps.length; i++) {
+            setCurrentDeepDiveStep(i);
+            const step = simulationSteps[i];
+
+            if(step.simulationResult === null && Object.keys(step.simulationParams).length > 0) {
+                const stepSimResult = await runDeepDiveSimulation(values, step.simulationParams, setLiveData);
+                simulationSteps[i].simulationResult = stepSimResult;
+                setDeepDiveSteps([...simulationSteps]);
+                await new Promise(r => setTimeout(r, 1000)); // Pause to let user see results
+            } else if (step.simulationResult) {
+                 await runDeepDiveSimulation(values, {}, setLiveData);
+                 await new Promise(r => setTimeout(r, 1000));
+            }
+
+            if(i < simulationSteps.length -1) {
+              await new Promise(r => setTimeout(r, 2000)); // wait before going to next step
+            }
         }
+        
+        toast({
+            title: "AI Deep Dive Complete",
+            description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A.`,
+            duration: 9000,
+        });
+
+        form.setValue('coolingMethod', result.data.bestCoolingMethod);
+        form.setValue('switchingFrequency', result.data.optimalFrequency);
+        setIsDeepDiveRunning(false);
     });
 
-}, [simulationResult, aiOptimizationSuggestions, form, toast]);
+}, [simulationResult, aiOptimizationSuggestions, form, toast, runDeepDiveSimulation]);
 
 
   return (
@@ -399,6 +473,9 @@ export default function AmpereAnalyzer() {
                 liveData={liveData}
                 formValues={form.getValues()}
                 onAiDeepDive={handleAiDeepDive}
+                isDeepDiveRunning={isDeepDiveRunning}
+                deepDiveSteps={deepDiveSteps}
+                currentDeepDiveStep={currentDeepDiveStep}
             />
         </div>
       </div>
