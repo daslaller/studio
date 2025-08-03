@@ -51,22 +51,22 @@ export default function LiveSimulationView({ liveData, simulationMode, maxTemper
     };
 
     const barChartData = [
-        { name: 'Current', value: lastPoint.current, fill: 'var(--color-green)' },
-        { name: 'Junction Temp', value: lastPoint.temperature, fill: 'var(--color-orange)' },
-        { name: 'Total Heat', value: lastPoint.powerLoss, fill: 'var(--color-red)' },
-        { name: 'Conduction Loss', value: lastPoint.conductionLoss, fill: 'var(--color-purple)' },
-        { name: 'Switching Loss', value: lastPoint.switchingLoss, fill: 'var(--color-pink)' },
+        { name: 'Current (A)', value: lastPoint.current, fill: 'var(--color-current)' },
+        { name: 'Junction Temp (°C)', value: lastPoint.temperature, fill: 'var(--color-temp)' },
+        { name: 'Total Heat (W)', value: lastPoint.powerLoss, fill: 'var(--color-heat)' },
+        { name: 'Conduction (W)', value: lastPoint.conductionLoss, fill: 'var(--color-conduction)' },
+        { name: 'Switching (W)', value: lastPoint.switchingLoss, fill: 'var(--color-switching)' },
     ];
     
     return (
-        <Card className="h-full">
+        <Card className="h-full bg-card/80 backdrop-blur-sm">
             <style jsx global>{`
                 :root {
-                    --color-green: #4ade80;
-                    --color-orange: #fb923c;
-                    --color-red: #f87171;
-                    --color-purple: #a78bfa;
-                    --color-pink: #f472b6;
+                    --color-current: hsl(var(--chart-1));
+                    --color-temp: hsl(var(--chart-2));
+                    --color-heat: hsl(var(--chart-3));
+                    --color-conduction: hsl(var(--chart-4));
+                    --color-switching: hsl(var(--chart-5));
                 }
             `}</style>
             <CardHeader>
@@ -74,7 +74,7 @@ export default function LiveSimulationView({ liveData, simulationMode, maxTemper
                 <CardDescription>Visualizing simulation progress in real-time...</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="w-full h-52">
+                <div className="w-full h-48">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                             data={liveData}
@@ -119,10 +119,10 @@ export default function LiveSimulationView({ liveData, simulationMode, maxTemper
                 
                  <div className="w-full h-48">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 20, left: 50, bottom: 5 }}>
+                         <BarChart data={barChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
-                            <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12}/>
-                            <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={100} />
+                            <XAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={10} interval={0} angle={-30} textAnchor='end' height={60} />
+                            <YAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                             <Tooltip cursor={{fill: 'hsl(var(--muted) / 0.5)'}} contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                             <Bar dataKey="value" isAnimationActive={false} />
                         </BarChart>
