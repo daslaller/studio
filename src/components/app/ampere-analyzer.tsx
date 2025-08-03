@@ -186,10 +186,10 @@ export default function AmpereAnalyzer() {
   };
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8">
       <header className="text-center">
-        <h1 className="text-5xl font-bold tracking-tighter text-primary">Ampere Analyzer</h1>
-        <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
+        <h1 className="text-5xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-white to-purple-400">Ampere Analyzer</h1>
+        <p className="mt-4 text-lg text-purple-200/80 max-w-2xl mx-auto">
           AI-powered transistor analysis and thermal simulation.
         </p>
       </header>
