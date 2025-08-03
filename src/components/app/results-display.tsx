@@ -96,7 +96,7 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
           <CardHeader>
             <CardTitle>AI-Calculated Safe Limits</CardTitle>
             <CardDescription>AI-powered estimation based on the datasheet.</CardDescription>
-          </Header>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ResultMetric icon={Gauge} label="Expected Max Current" value={aiCalculatedResults.expectedMaxCurrent.toFixed(2)} unit="A" />
