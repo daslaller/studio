@@ -142,9 +142,9 @@ export default function AmpereAnalyzer() {
         setDatasheetSpecs(specsResult.data);
         
         // Auto-populate manual fields
-        form.setValue('maxCurrent', parseFloat(specsResult.data.maxCurrent) || 0);
-        form.setValue('maxVoltage', parseFloat(specsResult.data.maxVoltage) || 0);
-        form.setValue('powerDissipation', parseFloat(specsResult.data.powerDissipation) || 0);
+        form.setValue('maxCurrent', parseFloat(specsResult.data.maxCurrent) || undefined);
+        form.setValue('maxVoltage', parseFloat(specsResult.data.maxVoltage) || undefined);
+        form.setValue('powerDissipation', parseFloat(specsResult.data.powerDissipation) || undefined);
 
         datasheetContentForAi = `Max Current: ${specsResult.data.maxCurrent}, Max Voltage: ${specsResult.data.maxVoltage}, Power Dissipation: ${specsResult.data.powerDissipation}`;
 
@@ -186,18 +186,18 @@ export default function AmpereAnalyzer() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <header className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-primary">Ampere Analyzer</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
+        <h1 className="text-5xl font-bold tracking-tighter text-primary">Ampere Analyzer</h1>
+        <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
           AI-powered transistor analysis and thermal simulation.
         </p>
       </header>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+        <div className="md:col-span-2">
             <SimulationForm form={form} onSubmit={onSubmit} isPending={isPending} />
         </div>
-        <div className="lg:col-span-3">
+        <div className="md:col-span-3">
             <ResultsDisplay
                 isLoading={isPending}
                 simulationResult={simulationResult}
