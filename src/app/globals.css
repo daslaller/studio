@@ -34,9 +34,10 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.75rem;
 
-    --gradient-color-1: #000428;
-    --gradient-color-2: #004e92;
-    --gradient-color-3: #1c2331;
+    /* Default gradient colors, will be overridden by JS */
+    --gradient-color-1: #4A00E0;
+    --gradient-color-2: #8E2DE2;
+    --gradient-color-3: #FF0080;
   }
   .dark {
     --background: 224 71% 4%;
