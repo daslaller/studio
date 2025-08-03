@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Upload, SlidersHorizontal, Package, Thermometer, Zap, ShieldAlert, Search, Info } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Loader2, Upload, SlidersHorizontal, Package, Thermometer, Zap, ShieldAlert, Search } from 'lucide-react';
 import React from 'react';
 import { coolingMethods, predefinedTransistors, transistorTypes } from '@/lib/constants';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -37,181 +37,185 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Package className="text-primary"/> Device & Specifications</CardTitle>
-            <CardDescription>Select a predefined component, upload a datasheet, or enter specs manually.</CardDescription>
+            <CardDescription>Select a component, upload a datasheet, or use the AI to search for one.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <FormField
+          <CardContent className="space-y-4">
+             <FormField
+                control={form.control}
+                name="predefinedComponent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Predefined Component</FormLabel>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      onTransistorSelect(value);
+                    }} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a predefined transistor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {predefinedTransistors.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Select a component to auto-fill its specs.</FormDescription>
+                  </FormItem>
+                )}
+              />
+             <div className="text-center text-xs text-muted-foreground">OR</div>
+             <FormField
+                control={form.control}
+                name="componentName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Device Name</FormLabel>
+                    <div className="flex gap-2">
+                        <FormControl><Input placeholder="e.g. IRFZ44N" {...field} /></FormControl>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button type="button" onClick={onDatasheetLookup} disabled={isPending} aria-label="Look up datasheet">
+                                  <Search />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Search online or parse uploaded PDF</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+             <FormField
               control={form.control}
-              name="inputMode"
+              name="datasheet"
               render={({ field }) => (
-                <Tabs defaultValue={field.value} onValueChange={field.onChange} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="datasheet"><Upload className="mr-2 h-4 w-4"/> Datasheet</TabsTrigger>
-                      <TabsTrigger value="manual"><SlidersHorizontal className="mr-2 h-4 w-4"/> Manual Input</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="datasheet" className="pt-4 space-y-4">
-                     <FormField
-                        control={form.control}
-                        name="predefinedComponent"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Predefined Component</FormLabel>
-                            <Select onValueChange={(value) => {
-                              field.onChange(value);
-                              onTransistorSelect(value);
-                            }} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a predefined transistor" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {predefinedTransistors.map((t) => (
-                                  <SelectItem key={t.value} value={t.value}>
-                                    {t.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>Select a component to auto-fill its specs.</FormDescription>
-                          </FormItem>
-                        )}
-                      />
-                     <div className="text-center text-xs text-muted-foreground">OR</div>
-                     <FormField
-                        control={form.control}
-                        name="componentName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Device Name</FormLabel>
-                            <div className="flex gap-2">
-                                <FormControl><Input placeholder="e.g. IRFZ44N" {...field} /></FormControl>
-                                <Button type="button" onClick={onDatasheetLookup} disabled={isPending} aria-label="Look up datasheet">
-                                    <Search />
-                                </Button>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                     <FormField
-                      control={form.control}
-                      name="datasheet"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Datasheet File (PDF)</FormLabel>
-                          <FormControl>
-                             <Input 
-                                type="file" 
-                                accept=".pdf"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0] || null;
-                                    field.onChange(file);
-                                    setDatasheetFile(file);
-                                }}
-                                />
-                          </FormControl>
-                          <FormDescription>The AI will parse this to populate the fields.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </TabsContent>
-                  <TabsContent value="manual" className="pt-1">
-                       <div className="space-y-4 pt-4">
-                           <FormField
-                              control={form.control}
-                              name="transistorType"
-                              render={({ field }) => (
-                                  <FormItem>
-                                      <FormLabel>Transistor Type</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                          <FormControl>
-                                              <SelectTrigger><SelectValue placeholder="Select transistor type..." /></SelectTrigger>
-                                          </FormControl>
-                                          <SelectContent>
-                                              {transistorTypes.map(type => (
-                                                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                                              ))}
-                                          </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                  </FormItem>
-                              )}
-                          />
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {isMosfetType(currentTransistorType) ? (
-                                <FormField control={form.control} name="rdsOn" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>RDS(on) (m&#8486;)</FormLabel>
-                                        <FormControl><Input type="number" step="any" placeholder="e.g., 17.5" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            ) : (
-                                <FormField control={form.control} name="vceSat" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Vce(sat) (V)</FormLabel>
-                                        <FormControl><Input type="number" step="any" placeholder="e.g., 1.2" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            )}
-                            <FormField control={form.control} name="rthJC" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Rth (j-c) (°C/W)</FormLabel>
-                                    <FormControl><Input type="number" step="any" placeholder="e.g., 1.5" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="maxCurrent" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Max Current (A)</FormLabel>
-                                <FormControl><Input type="number" step="any" placeholder="e.g., 49" {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={form.control} name="maxVoltage" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Max Voltage (V)</FormLabel>
-                                <FormControl><Input type="number" step="any" placeholder="e.g., 55" {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                             <FormField control={form.control} name="powerDissipation" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Max Power (W)</FormLabel>
-                                <FormControl><Input type="number" step="any" placeholder="e.g., 94" {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={form.control} name="maxTemperature" render={({ field }) => (
-                              <FormItem>
-                                  <FormLabel>Max Junction Temp (°C)</FormLabel>
-                                  <FormControl><Input type="number" placeholder="e.g. 150" {...field} /></FormControl>
-                                  <FormMessage />
-                              </FormItem>
-                           )} />
-                            <FormField control={form.control} name="riseTime" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Rise Time (ns)</FormLabel>
-                                <FormControl><Input type="number" step="any" placeholder="e.g., 60" {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={form.control} name="fallTime" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Fall Time (ns)</FormLabel>
-                                <FormControl><Input type="number" step="any" placeholder="e.g., 45" {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-                       </div>
-                  </TabsContent>
-                </Tabs>
+                <FormItem>
+                  <FormLabel>Upload Datasheet (Optional)</FormLabel>
+                  <FormControl>
+                     <Input 
+                        type="file" 
+                        accept=".pdf"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            field.onChange(file);
+                            setDatasheetFile(file);
+                        }}
+                        />
+                  </FormControl>
+                  <FormDescription>If you provide a PDF, the AI will use it instead of searching online.</FormDescription>
+                  <FormMessage />
+                </FormItem>
               )}
             />
+            
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger>
+                  <div className='flex items-center gap-2'>
+                    <SlidersHorizontal className='h-4 w-4' />
+                    Advanced Specifications
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4 pt-4">
+                     <FormField
+                        control={form.control}
+                        name="transistorType"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Transistor Type</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select transistor type..." /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {transistorTypes.map(type => (
+                                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {isMosfetType(currentTransistorType) ? (
+                          <FormField control={form.control} name="rdsOn" render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>RDS(on) (m&#8486;)</FormLabel>
+                                  <FormControl><Input type="number" step="any" placeholder="e.g., 17.5" {...field} /></FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                          )} />
+                      ) : (
+                          <FormField control={form.control} name="vceSat" render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Vce(sat) (V)</FormLabel>
+                                  <FormControl><Input type="number" step="any" placeholder="e.g., 1.2" {...field} /></FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                          )} />
+                      )}
+                      <FormField control={form.control} name="rthJC" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Rth (j-c) (°C/W)</FormLabel>
+                              <FormControl><Input type="number" step="any" placeholder="e.g., 1.5" {...field} /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                      <FormField control={form.control} name="maxCurrent" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Current (A)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 49" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="maxVoltage" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Voltage (V)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 55" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                       <FormField control={form.control} name="powerDissipation" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Power (W)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 94" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="maxTemperature" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Max Junction Temp (°C)</FormLabel>
+                            <FormControl><Input type="number" placeholder="e.g. 150" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                     )} />
+                      <FormField control={form.control} name="riseTime" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rise Time (ns)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 60" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="fallTime" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fall Time (ns)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 45" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 
@@ -362,5 +366,3 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
-
-    

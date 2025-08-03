@@ -4,13 +4,15 @@ import { z } from "zod";
 import { extractTransistorSpecs } from "@/ai/flows/ai-datasheet-reader";
 import { aiCalculateExpectedResults } from "@/ai/flows/ai-calculate-expected-results";
 import { getAiOptimizationSuggestions } from "@/ai/flows/ai-optimization-advisor";
+import { findAndParseDatasheet } from "@/ai/flows/ai-datasheet-finder";
+
 
 const datasheetSchema = z.object({
   componentName: z.string().min(1, "Component name is required."),
-  datasheet: z.instanceof(File).refine(file => file.size > 0, "Datasheet file is required."),
+  datasheet: z.instanceof(File).optional(),
 });
 
-export async function extractTransistorSpecsAction(formData: FormData) {
+export async function findOrExtractTransistorSpecsAction(formData: FormData) {
   try {
     const validated = datasheetSchema.safeParse({
       componentName: formData.get('componentName'),
@@ -20,18 +22,25 @@ export async function extractTransistorSpecsAction(formData: FormData) {
     if (!validated.success) {
       return { error: "Invalid input.", details: validated.error.format() };
     }
-
+    
     const { componentName, datasheet } = validated.data;
 
-    const buffer = await datasheet.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    const pdfDataUri = `data:${datasheet.type};base64,${base64}`;
+    // If a datasheet is provided, use the existing extraction flow
+    if (datasheet && datasheet.size > 0) {
+      const buffer = await datasheet.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+      const pdfDataUri = `data:${datasheet.type};base64,${base64}`;
+      const specs = await extractTransistorSpecs({ pdfDataUri, componentName });
+      return { data: specs, source: 'pdf' };
+    }
 
-    const specs = await extractTransistorSpecs({ pdfDataUri, componentName });
-    return { data: specs };
+    // If no datasheet, use the new finder flow
+    const specs = await findAndParseDatasheet({ componentName });
+    return { data: specs, source: 'web' };
+
   } catch (e) {
     console.error(e);
-    return { error: "Failed to extract specs from datasheet." };
+    return { error: "Failed to find or extract specs from datasheet." };
   }
 }
 

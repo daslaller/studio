@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
-import { extractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction } from '@/app/actions';
+import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction } from '@/app/actions';
 import type { SimulationResult, ExtractTransistorSpecsOutput, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 
@@ -18,7 +18,6 @@ const isMosfetType = (type: string) => {
 const formSchema = z.object({
   predefinedComponent: z.string().optional(),
   componentName: z.string().optional(),
-  inputMode: z.enum(['datasheet', 'manual']).default('datasheet'),
   datasheet: z.instanceof(File).optional(),
   
   // Core Specs
@@ -43,13 +42,6 @@ const formSchema = z.object({
   coolingBudget: z.coerce.number().optional(),
 
 }).superRefine((data, ctx) => {
-    if (data.inputMode === 'datasheet' && (!data.datasheet || data.datasheet.size === 0) && !data.predefinedComponent) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['datasheet'],
-            message: 'A Datasheet PDF is required when a predefined component is not selected.',
-        });
-    }
     if (isMosfetType(data.transistorType) && (!data.rdsOn || data.rdsOn <= 0)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['rdsOn'], message: 'Rds(on) is required for this transistor type and must be positive.' });
     }
@@ -71,7 +63,6 @@ export default function AmpereAnalyzer() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
-  const [datasheetSpecs, setDatasheetSpecs] = useState<ExtractTransistorSpecsOutput | null>(null);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [aiCalculatedResults, setAiCalculatedResults] = useState<AiCalculatedExpectedResultsOutput | null>(null);
   const [aiOptimizationSuggestions, setAiOptimizationSuggestions] = useState<AiOptimizationSuggestionsOutput | null>(null);
@@ -80,7 +71,6 @@ export default function AmpereAnalyzer() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      inputMode: 'datasheet',
       maxTemperature: 150,
       coolingMethod: 'air-tower',
       switchingFrequency: 100,
@@ -97,7 +87,6 @@ export default function AmpereAnalyzer() {
         ...form.getValues(),
         predefinedComponent: value,
         componentName: transistor.name,
-        inputMode: 'manual',
         transistorType: transistor.specs.transistorType,
         maxCurrent: parseFloat(transistor.specs.maxCurrent),
         maxVoltage: parseFloat(transistor.specs.maxVoltage),
@@ -117,46 +106,46 @@ export default function AmpereAnalyzer() {
     const componentName = form.getValues('componentName');
     const datasheet = datasheetFile;
 
-    if (!datasheet) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a datasheet file first.' });
-      return;
-    }
      if (!componentName) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a component name for the datasheet.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a component name.' });
       return;
     }
 
     startTransition(async () => {
       const formData = new FormData();
       formData.append('componentName', componentName);
-      formData.append('datasheet', datasheet);
+      if (datasheet) {
+        formData.append('datasheet', datasheet);
+      }
 
-      const result = await extractTransistorSpecsAction(formData);
+      const result = await findOrExtractTransistorSpecsAction(formData);
 
       if (result.error) {
         toast({ variant: 'destructive', title: 'Datasheet Parsing Error', description: result.error });
       } else if (result.data) {
-        setDatasheetSpecs(result.data);
-        // Auto-populate manual fields
-        form.setValue('maxCurrent', parseFloat(result.data.maxCurrent) || 0);
-        form.setValue('maxVoltage', parseFloat(result.data.maxVoltage) || 0);
-        form.setValue('powerDissipation', parseFloat(result.data.powerDissipation) || 0);
-        form.setValue('rthJC', parseFloat(result.data.rthJC) || 0);
-        form.setValue('maxTemperature', parseFloat(result.data.maxTemperature) || 150);
-        form.setValue('riseTime', parseFloat(result.data.riseTime) || 0);
-        form.setValue('fallTime', parseFloat(result.data.fallTime) || 0);
+        const { data, source } = result;
+        form.setValue('maxCurrent', parseFloat(data.maxCurrent) || 0);
+        form.setValue('maxVoltage', parseFloat(data.maxVoltage) || 0);
+        form.setValue('powerDissipation', parseFloat(data.powerDissipation) || 0);
+        form.setValue('rthJC', parseFloat(data.rthJC) || 0);
+        form.setValue('maxTemperature', parseFloat(data.maxTemperature) || 150);
+        form.setValue('riseTime', parseFloat(data.riseTime) || 0);
+        form.setValue('fallTime', parseFloat(data.fallTime) || 0);
         
-        const type = result.data.transistorType || form.getValues('transistorType');
+        const type = data.transistorType || form.getValues('transistorType');
         form.setValue('transistorType', type);
         
         if (isMosfetType(type)) {
-            form.setValue('rdsOn', parseFloat(result.data.rdsOn) || 0);
+            form.setValue('rdsOn', parseFloat(data.rdsOn) || 0);
         } else {
-            form.setValue('vceSat', parseFloat(result.data.vceSat) || 0);
+            form.setValue('vceSat', parseFloat(data.vceSat) || 0);
         }
         
-        toast({ title: 'Datasheet Parsed', description: 'Specifications have been extracted and populated in the manual fields.' });
-        form.setValue('inputMode', 'manual');
+        const toastTitle = source === 'pdf' ? 'Datasheet Parsed' : 'AI Analysis Complete';
+        const toastDescription = source === 'pdf'
+          ? 'Specifications have been extracted and populated.'
+          : 'AI has populated the specs based on online data or its best estimate.';
+        toast({ title: toastTitle, description: toastDescription });
       }
     });
   };
@@ -232,8 +221,8 @@ export default function AmpereAnalyzer() {
         ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
         : values.componentName || 'N/A';
 
-      if (values.inputMode === 'datasheet') {
-        toast({ variant: 'destructive', title: 'Manual Mode Required', description: 'Please parse a datasheet or select a predefined component first, which will switch to manual mode.' });
+      if (values.maxCurrent <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please populate component specs before running an analysis.' });
         return;
       }
 
@@ -304,5 +293,3 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-
-    
