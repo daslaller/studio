@@ -29,4 +29,5 @@ export type CoolingMethod = {
   name: string;
   value: string;
   thermalResistance: number;
+  coolingBudget: number;
 };

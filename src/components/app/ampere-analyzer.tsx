@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,11 +13,35 @@ import { coolingMethods } from '@/lib/constants';
 
 const formSchema = z.object({
   componentName: z.string().min(1, 'Component name is required'),
-  datasheet: z.instanceof(File).refine(file => file.size > 0, 'Datasheet PDF is required.'),
+  inputMode: z.enum(['datasheet', 'manual']).default('datasheet'),
+  datasheet: z.instanceof(File).optional(),
+  maxCurrent: z.coerce.number().optional(),
+  maxVoltage: z.coerce.number().optional(),
+  powerDissipation: z.coerce.number().optional(),
   coolingBudget: z.coerce.number().min(0, 'Cooling budget must be positive'),
   maxTemperature: z.coerce.number().min(0, 'Max temperature must be positive'),
   coolingMethod: z.string().min(1, 'Please select a cooling method'),
+}).superRefine((data, ctx) => {
+    if (data.inputMode === 'datasheet' && (!data.datasheet || data.datasheet.size === 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['datasheet'],
+            message: 'Datasheet PDF is required in Datasheet Mode.',
+        });
+    }
+    if (data.inputMode === 'manual') {
+        if (!data.maxCurrent || data.maxCurrent <= 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxCurrent'], message: 'Max current must be a positive number.' });
+        }
+        if (!data.maxVoltage || data.maxVoltage <= 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxVoltage'], message: 'Max voltage must be a positive number.' });
+        }
+        if (!data.powerDissipation || data.powerDissipation <= 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['powerDissipation'], message: 'Power dissipation must be a positive number.' });
+        }
+    }
 });
+
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -34,11 +58,22 @@ export default function AmpereAnalyzer() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       componentName: '',
+      inputMode: 'datasheet',
       coolingBudget: 100,
       maxTemperature: 125,
       coolingMethod: 'active-air',
     },
   });
+
+  const selectedCoolingMethodValue = form.watch('coolingMethod');
+
+  useEffect(() => {
+    const selectedCooling = coolingMethods.find(c => c.value === selectedCoolingMethodValue);
+    if (selectedCooling) {
+      form.setValue('coolingBudget', selectedCooling.coolingBudget);
+    }
+  }, [selectedCoolingMethodValue, form]);
+
 
   const runSimulation = (
     specs: ExtractTransistorSpecsOutput,
@@ -89,26 +124,50 @@ export default function AmpereAnalyzer() {
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
 
-      const formData = new FormData();
-      formData.append('componentName', values.componentName);
-      formData.append('datasheet', values.datasheet);
+      let specsToSimulate: ExtractTransistorSpecsOutput | null = null;
+      let datasheetContentForAi = '';
 
-      const specsResult = await extractTransistorSpecsAction(formData);
-      if (specsResult.error || !specsResult.data) {
-        toast({ variant: 'destructive', title: 'Error', description: specsResult.error });
+      if (values.inputMode === 'datasheet' && values.datasheet) {
+        const formData = new FormData();
+        formData.append('componentName', values.componentName);
+        formData.append('datasheet', values.datasheet);
+
+        const specsResult = await extractTransistorSpecsAction(formData);
+        if (specsResult.error || !specsResult.data) {
+          toast({ variant: 'destructive', title: 'Error', description: specsResult.error });
+          return;
+        }
+        
+        specsToSimulate = specsResult.data;
+        setDatasheetSpecs(specsResult.data);
+        
+        // Auto-populate manual fields
+        form.setValue('maxCurrent', parseFloat(specsResult.data.maxCurrent) || 0);
+        form.setValue('maxVoltage', parseFloat(specsResult.data.maxVoltage) || 0);
+        form.setValue('powerDissipation', parseFloat(specsResult.data.powerDissipation) || 0);
+
+        datasheetContentForAi = `Max Current: ${specsResult.data.maxCurrent}, Max Voltage: ${specsResult.data.maxVoltage}, Power Dissipation: ${specsResult.data.powerDissipation}`;
+
+      } else if (values.inputMode === 'manual') {
+        specsToSimulate = {
+            maxCurrent: String(values.maxCurrent),
+            maxVoltage: String(values.maxVoltage),
+            powerDissipation: String(values.powerDissipation),
+        };
+        datasheetContentForAi = `Max Current: ${values.maxCurrent}A, Max Voltage: ${values.maxVoltage}V, Power Dissipation: ${values.powerDissipation}W (manual input)`;
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Invalid input mode or missing data.' });
         return;
       }
-      setDatasheetSpecs(specsResult.data);
       
-      const simResult = runSimulation(specsResult.data, values);
+      const simResult = runSimulation(specsToSimulate, values);
       setSimulationResult(simResult);
 
       const simulationSummary = `Result: ${simResult.status}. Failure Reason: ${simResult.failureReason || 'None'}. Details: ${simResult.details}`;
-      const datasheetContent = `Max Current: ${specsResult.data.maxCurrent}, Max Voltage: ${specsResult.data.maxVoltage}, Power Dissipation: ${specsResult.data.powerDissipation}`;
 
       // Fire off AI calls in parallel
       const [aiCalculations, aiSuggestions] = await Promise.all([
-        getAiCalculationsAction(values.componentName, datasheetContent),
+        getAiCalculationsAction(values.componentName, datasheetContentForAi),
         getAiSuggestionsAction(
           values.componentName,
           values.coolingMethod,

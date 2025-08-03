@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Search, Upload } from 'lucide-react';
 import React, { useRef } from 'react';
 import { coolingMethods } from '@/lib/constants';
@@ -24,8 +25,8 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Device & Datasheet</CardTitle>
-            <CardDescription>Enter component details to begin analysis.</CardDescription>
+            <CardTitle>Device & Specifications</CardTitle>
+            <CardDescription>Enter component details via datasheet or manual input.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
@@ -46,34 +47,90 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
             />
             <FormField
               control={form.control}
-              name="datasheet"
+              name="inputMode"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Datasheet (PDF)</FormLabel>
+                <FormItem className="pt-2">
                   <FormControl>
-                    <div>
-                      <Input
-                        type="file"
-                        accept=".pdf"
-                        ref={fileInputRef}
-                        className="hidden"
-                        onChange={(e) => field.onChange(e.target.files?.[0])}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        {field.value ? field.value.name : 'Upload PDF'}
-                      </Button>
-                    </div>
+                     <Tabs defaultValue={field.value} onValueChange={field.onChange} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="datasheet">Datasheet Upload</TabsTrigger>
+                            <TabsTrigger value="manual">Manual Input</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="datasheet">
+                            <FormField
+                                control={form.control}
+                                name="datasheet"
+                                render={({ field: fileField }) => (
+                                    <FormItem className="mt-4">
+                                        <FormLabel>Datasheet (PDF)</FormLabel>
+                                        <FormControl>
+                                            <div>
+                                                <Input
+                                                    type="file"
+                                                    accept=".pdf"
+                                                    ref={fileInputRef}
+                                                    className="hidden"
+                                                    onChange={(e) => fileField.onChange(e.target.files?.[0])}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-start text-left font-normal"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    <Upload className="mr-2 h-4 w-4" />
+                                                    {fileField.value ? fileField.value.name : 'Upload PDF'}
+                                                </Button>
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </TabsContent>
+                        <TabsContent value="manual">
+                            <div className="space-y-4 pt-4">
+                                <FormField
+                                  control={form.control}
+                                  name="maxCurrent"
+                                  render={({ field: manualField }) => (
+                                    <FormItem>
+                                      <FormLabel>Max Current (A)</FormLabel>
+                                      <FormControl><Input type="number" step="any" placeholder="e.g., 8" {...manualField} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="maxVoltage"
+                                  render={({ field: manualField }) => (
+                                    <FormItem>
+                                      <FormLabel>Max Voltage (V)</FormLabel>
+                                      <FormControl><Input type="number" step="any" placeholder="e.g., 30" {...manualField} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="powerDissipation"
+                                  render={({ field: manualField }) => (
+                                    <FormItem>
+                                      <FormLabel>Power Dissipation (W)</FormLabel>
+                                      <FormControl><Input type="number" step="any" placeholder="e.g., 0.625" {...manualField} /></FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                            </div>
+                        </TabsContent>
+                     </Tabs>
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
+            
           </CardContent>
         </Card>
 
@@ -83,6 +140,30 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
             <CardDescription>Set the operational limits for the simulation.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="coolingMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cooling Method</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a cooling method" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {coolingMethods.map((method) => (
+                        <SelectItem key={method.value} value={method.value}>
+                          {method.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="coolingBudget"
@@ -105,30 +186,6 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                   <FormControl>
                     <Input type="number" placeholder="125" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="coolingMethod"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cooling Method</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a cooling method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {coolingMethods.map((method) => (
-                        <SelectItem key={method.value} value={method.value}>
-                          {method.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
