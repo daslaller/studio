@@ -3,16 +3,16 @@
 import AmpereAnalyzer from '@/components/app/ampere-analyzer';
 import { useEffect, useState } from 'react';
 
-// Lighter, complementary color palette
+// A more vivid and saturated color palette for the background gradient
 const vibrantColors = [
-  "#81C784", // Light Green
-  "#64B5F6", // Light Blue
-  "#9575CD", // Deep Purple
-  "#4DB6AC", // Teal
-  "#7986CB", // Indigo
-  "#F06292", // Light Pink
-  "#FFD54F", // Amber
-  "#BA68C8"  // Purple
+  '#4A00E0', // Vibrant Blue-Purple
+  '#8E2DE2', // Bright Purple
+  '#FF0080', // Electric Pink
+  '#00F260', // Neon Green
+  '#0575E6', // Strong Blue
+  '#f27121', // Bright Orange
+  '#e94057', // Strong Pink
+  '#8A2387', // Deep Magenta
 ];
 
 
