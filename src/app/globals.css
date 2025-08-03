@@ -26,12 +26,12 @@ body {
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 22.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 221 83% 53%; /* Ultramarine Blue */
-    --chart-1: 221 83% 53%;
-    --chart-2: 142 76% 40%;
-    --chart-3: 173 58% 39%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --ring: 142 76% 40%; /* Light Green Ring */
+    --chart-1: 221 83% 53%; /* Ultramarine Blue */
+    --chart-2: 142 76% 40%; /* Light Green */
+    --chart-3: 173 58% 39%; /* Tealish Green */
+    --chart-4: 217 91% 65%; /* Bright Blue */
+    --chart-5: 142 63% 55%; /* Softer Green */
     --radius: 0.75rem;
 
     /* Default gradient colors, will be overridden by JS */
@@ -56,12 +56,12 @@ body {
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 22.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 221 83% 53%; /* Ultramarine Blue */
-    --chart-1: 221 83% 53%;
-    --chart-2: 142 76% 40%;
-    --chart-3: 173 58% 39%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --ring: 142 76% 40%; /* Light Green Ring */
+    --chart-1: 221 83% 53%; /* Ultramarine Blue */
+    --chart-2: 142 76% 40%; /* Light Green */
+    --chart-3: 173 58% 39%; /* Tealish Green */
+    --chart-4: 217 91% 65%; /* Bright Blue */
+    --chart-5: 142 63% 55%; /* Softer Green */
   }
 }
 

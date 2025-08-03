@@ -102,16 +102,26 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Device Name</FormLabel>
-                    <div className="flex gap-2">
-                        <FormControl><Input placeholder="e.g. IRFZ44N" {...field} value={field.value ?? ''} /></FormControl>
+                     <div className="relative">
+                        <FormControl>
+                          <Input placeholder="e.g. IRFZ44N" {...field} value={field.value ?? ''} className="pr-10" />
+                        </FormControl>
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button type="button" onClick={onDatasheetLookup} disabled={isPending} aria-label="Look up datasheet">
-                                  <Search />
-                              </Button>
+                              <button
+                                type="button"
+                                onClick={onDatasheetLookup}
+                                disabled={isPending}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary transition-colors"
+                                aria-label="Look up datasheet"
+                              >
+                                <Search className="h-5 w-5" />
+                              </button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Search online or parse uploaded PDF</p></TooltipContent>
+                            <TooltipContent>
+                              <p>Search online or parse uploaded PDF</p>
+                            </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                     </div>
