@@ -3,16 +3,16 @@
 import AmpereAnalyzer from '@/components/app/ampere-analyzer';
 import { useEffect, useState } from 'react';
 
-// Vibrant color palette inspired by the user's reference image
+// Lighter, complementary color palette
 const vibrantColors = [
-  "#8E2DE2", // Purple
-  "#4A00E0", // Blue/Purple
-  "#FF0080", // Pink/Magenta
-  "#00D2FF", // Light Blue
-  "#F953C6", // Pink
-  "#E44D26", // Orange
-  "#6A11CB", // Another Purple
-  "#2575FC"  // Royal Blue
+  "#81C784", // Light Green
+  "#64B5F6", // Light Blue
+  "#9575CD", // Deep Purple
+  "#4DB6AC", // Teal
+  "#7986CB", // Indigo
+  "#F06292", // Light Pink
+  "#FFD54F", // Amber
+  "#BA68C8"  // Purple
 ];
 
 
