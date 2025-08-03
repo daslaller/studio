@@ -1,7 +1,13 @@
-export interface ExtractTransistorSpecsOutput {
+export interface ManualSpecs {
   maxCurrent: string;
   maxVoltage: string;
   powerDissipation: string;
+  rdsOn: string;
+  riseTime: string;
+  fallTime: string;
+}
+
+export interface ExtractTransistorSpecsOutput extends ManualSpecs {
 }
 
 export interface AiCalculatedExpectedResultsOutput {
@@ -22,7 +28,11 @@ export interface SimulationResult {
   failureReason: 'Thermal' | 'Voltage' | 'Current' | null;
   details: string;
   finalTemperature: number;
-  powerDissipation: number;
+  powerDissipation: {
+    total: number;
+    conduction: number;
+    switching: number;
+  };
 }
 
 export type CoolingMethod = {
@@ -30,4 +40,10 @@ export type CoolingMethod = {
   value: string;
   thermalResistance: number;
   coolingBudget: number;
+};
+
+export type PredefinedTransistor = {
+  name: string;
+  value: string;
+  specs: ManualSpecs;
 };

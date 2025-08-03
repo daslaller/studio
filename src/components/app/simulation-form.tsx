@@ -7,17 +7,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Search, Upload } from 'lucide-react';
+import { Loader2, Search, Upload, SlidersHorizontal } from 'lucide-react';
 import React, { useRef } from 'react';
-import { coolingMethods } from '@/lib/constants';
+import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 
 interface SimulationFormProps {
   form: UseFormReturn<any>;
   onSubmit: (values: any) => void;
   isPending: boolean;
+  onTransistorSelect: (value: string) => void;
 }
 
-export default function SimulationForm({ form, onSubmit, isPending }: SimulationFormProps) {
+export default function SimulationForm({ form, onSubmit, isPending, onTransistorSelect }: SimulationFormProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const selectedCoolingMethod = coolingMethods.find(m => m.value === form.watch('coolingMethod'));
 
@@ -27,25 +28,37 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
         <Card>
           <CardHeader>
             <CardTitle>Device & Specifications</CardTitle>
-            <CardDescription>Enter component details via datasheet or manual input.</CardDescription>
+            <CardDescription>Select a predefined component, upload a datasheet, or enter specs manually.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="componentName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Device Name</FormLabel>
-                  <div className="relative">
-                    <FormControl>
-                      <Input placeholder="e.g., 2N2222A" {...field} />
-                    </FormControl>
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <FormField
+                control={form.control}
+                name="predefinedComponent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Predefined Component</FormLabel>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      onTransistorSelect(value);
+                    }} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a predefined transistor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {predefinedTransistors.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
             <FormField
               control={form.control}
               name="inputMode"
@@ -53,8 +66,8 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                 <FormItem className="pt-2">
                    <Tabs defaultValue={field.value} onValueChange={field.onChange} className="w-full">
                       <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="datasheet">Datasheet Upload</TabsTrigger>
-                          <TabsTrigger value="manual">Manual Input</TabsTrigger>
+                          <TabsTrigger value="datasheet"><Upload className="mr-2"/> Datasheet</TabsTrigger>
+                          <TabsTrigger value="manual"><SlidersHorizontal className="mr-2"/> Manual</TabsTrigger>
                       </TabsList>
                       <TabsContent value="datasheet" className="pt-4">
                           <FormField
@@ -75,7 +88,7 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                                               <Button
                                                   type="button"
                                                   variant="outline"
-                                                  className="w-full justify-start text-left font-normal"
+                                                  className="w-full justify-start text-left font-normal bg-white/5"
                                                   onClick={() => fileInputRef.current?.click()}
                                               >
                                                   <Upload className="mr-2 h-4 w-4" />
@@ -89,7 +102,7 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                           />
                       </TabsContent>
                       <TabsContent value="manual" className="pt-1">
-                          <div className="space-y-4 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                               <FormField
                                 control={form.control}
                                 name="maxCurrent"
@@ -117,8 +130,41 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                                 name="powerDissipation"
                                 render={({ field: manualField }) => (
                                   <FormItem>
-                                    <FormLabel>Power Dissipation (W)</FormLabel>
+                                    <FormLabel>Max Power (W)</FormLabel>
                                     <FormControl><Input type="number" step="any" placeholder="e.g., 0.625" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                               <FormField
+                                control={form.control}
+                                name="rdsOn"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>RDS(on) (&#8486;)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 0.018" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="riseTime"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>Rise Time (ns)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 50" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="fallTime"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>Fall Time (ns)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 50" {...manualField} /></FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -139,6 +185,19 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
             <CardDescription>Set the operational limits for the simulation.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+             <FormField
+                control={form.control}
+                name="switchingFrequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Switching Frequency (kHz)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 100" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
               name="coolingMethod"
@@ -169,23 +228,10 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
             />
             <FormField
               control={form.control}
-              name="coolingBudget"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cooling Budget (W)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="100" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="maxTemperature"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Max Temperature (°C)</FormLabel>
+                  <FormLabel>Max Junction Temp (°C)</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="125" {...field} />
                   </FormControl>

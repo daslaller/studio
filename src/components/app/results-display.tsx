@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp } from 'lucide-react';
 
 interface ResultsDisplayProps {
   isLoading: boolean;
@@ -72,10 +72,12 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
             <AlertTitle className="font-bold">{isSuccess ? 'Analysis Successful' : `Failure: ${simulationResult.failureReason} Limit Reached`}</AlertTitle>
             <AlertDescription>{simulationResult.details}</AlertDescription>
           </Alert>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <ResultMetric icon={Gauge} label="Max Safe Current" value={simulationResult.maxSafeCurrent.toFixed(2)} unit="A" />
-            <ResultMetric icon={Thermometer} label="Final Temperature" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" />
-            <ResultMetric icon={Zap} label="Power Dissipation" value={simulationResult.powerDissipation.toFixed(2)} unit="W" />
+            <ResultMetric icon={Thermometer} label="Final Junction Temp" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" />
+            <ResultMetric icon={Zap} label="Total Power Loss" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" />
+            <ResultMetric icon={Cpu} label="Conduction Loss" value={simulationResult.powerDissipation.conduction.toFixed(2)} unit="W" />
+            <ResultMetric icon={TrendingUp} label="Switching Loss" value={simulationResult.powerDissipation.switching.toFixed(2)} unit="W" />
           </div>
         </CardContent>
       </Card>
@@ -85,7 +87,7 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
           <CardHeader>
             <CardTitle>AI-Calculated Safe Limits</CardTitle>
             <CardDescription>AI-powered estimation based on the datasheet.</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ResultMetric icon={Gauge} label="Expected Max Current" value={aiCalculatedResults.expectedMaxCurrent.toFixed(2)} unit="A" />
@@ -103,7 +105,7 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
           <CardHeader>
             <CardTitle>AI Optimization Advisor</CardTitle>
             <CardDescription>Suggestions to improve performance.</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-4">
             <ul className="space-y-2">
               {aiOptimizationSuggestions.suggestions.map((suggestion, index) => (
