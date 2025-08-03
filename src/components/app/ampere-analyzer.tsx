@@ -558,7 +558,7 @@ export default function AmpereAnalyzer() {
 
   const renderDialogs = () => {
     switch (dialogState.type) {
-        case 'datasheet_found':
+        case 'datasheet_found': {
             const { data } = dialogState;
             const { keyParameters } = data;
             return (
@@ -577,8 +577,9 @@ export default function AmpereAnalyzer() {
                                 Rds(on)/Vce(sat): <span className="font-medium text-foreground">{keyParameters.rdsOn || keyParameters.vceSat}</span>
                             </p>
                         </div>
-                        <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
+                             <Button variant="outline" onClick={handleBestEffortSearch}>Use Best Effort Instead</Button>
                             <AlertDialogAction onClick={() => {
                                 // For now, parsing the "found" PDF is a simulation. 
                                 // We'll trigger the best effort search to get full specs as if they were parsed.
@@ -589,6 +590,7 @@ export default function AmpereAnalyzer() {
                     </AlertDialogContent>
                 </AlertDialog>
             );
+        }
         case 'no_datasheet_found':
             return (
                 <AlertDialog open={true} onOpenChange={() => setDialogState({ type: 'idle' })}>
@@ -604,7 +606,7 @@ export default function AmpereAnalyzer() {
                     </AlertDialogContent>
                 </AlertDialog>
             );
-        case 'best_effort_found':
+        case 'best_effort_found': {
             const { data: specs } = dialogState;
             return (
                 <AlertDialog open={true} onOpenChange={() => setDialogState({ type: 'idle' })}>
@@ -631,6 +633,7 @@ export default function AmpereAnalyzer() {
                     </AlertDialogContent>
                 </AlertDialog>
             );
+        }
         default:
             return null;
     }
