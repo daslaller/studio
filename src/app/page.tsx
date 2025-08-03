@@ -1,3 +1,9 @@
+import AmpereAnalyzer from '@/components/app/ampere-analyzer';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main className="container mx-auto px-4 py-8">
+      <AmpereAnalyzer />
+    </main>
+  );
 }
