@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { UseFormReturn } from 'react-hook-form';
@@ -75,7 +76,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                   <FormItem>
                     <FormLabel>Device Name</FormLabel>
                     <div className="flex gap-2">
-                        <FormControl><Input placeholder="e.g. IRFZ44N" {...field} /></FormControl>
+                        <FormControl><Input placeholder="e.g. IRFZ44N" {...field} value={field.value ?? ''} /></FormControl>
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -292,13 +293,13 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                            <TooltipProvider>
                            <Tooltip>
                             <TooltipTrigger asChild>
-                                <FormItem>
+                                <FormItem className="flex-1">
                                     <FormControl>
                                         <RadioGroupItem value="ftf" id="ftf" className="peer sr-only" />
                                     </FormControl>
-                                    <FormLabel htmlFor="ftf" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    <FormLabel htmlFor="ftf" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                         First-To-Fail
-                                        <FormDescription className="text-center text-xs mt-2">Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.</FormDescription>
+                                        <FormDescription className="text-xs mt-2">Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.</FormDescription>
                                     </FormLabel>
                                 </FormItem>
                              </TooltipTrigger>
@@ -306,13 +307,13 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                            </Tooltip>
                            <Tooltip>
                             <TooltipTrigger asChild>
-                               <FormItem>
+                               <FormItem className="flex-1">
                                     <FormControl>
                                         <RadioGroupItem value="temp" id="temp" className="peer sr-only" />
                                     </FormControl>
-                                    <FormLabel htmlFor="temp" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    <FormLabel htmlFor="temp" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                         Temperature Limit
-                                         <FormDescription className="text-center text-xs mt-2">Stops only when the Max Junction Temp is exceeded.</FormDescription>
+                                         <FormDescription className="text-xs mt-2">Stops only when the Max Junction Temp is exceeded.</FormDescription>
                                     </FormLabel>
                                 </FormItem>
                             </TooltipTrigger>
@@ -320,13 +321,13 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                            </Tooltip>
                             <Tooltip>
                             <TooltipTrigger asChild>
-                               <FormItem>
+                               <FormItem className="flex-1">
                                     <FormControl>
                                         <RadioGroupItem value="budget" id="budget" className="peer sr-only" />
                                     </FormControl>
-                                    <FormLabel htmlFor="budget" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    <FormLabel htmlFor="budget" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                         Cooling Budget Limit
-                                         <FormDescription className="text-center text-xs mt-2">Stops only when power loss exceeds the cooling budget.</FormDescription>
+                                         <FormDescription className="text-xs mt-2">Stops only when power loss exceeds the cooling budget.</FormDescription>
                                     </FormLabel>
                                 </FormItem>
                             </TooltipTrigger>
