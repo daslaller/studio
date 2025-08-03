@@ -28,6 +28,12 @@ const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
 };
 
+const endConditionDescriptions: Record<string, string> = {
+    ftf: "Default and most realistic mode. Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.",
+    temp: "Isolates for thermal performance. Stops only when the Max Junction Temp is exceeded.",
+    budget: "Isolates for cooler performance. Stops only when power loss exceeds the cooling budget.",
+};
+
 export default function SimulationForm({ form, onSubmit, isPending, onTransistorSelect, onDatasheetLookup, setDatasheetFile }: SimulationFormProps) {
     const selectedCoolingMethod = coolingMethods.find(m => m.value === form.watch('coolingMethod'));
     const currentTransistorType = form.watch('transistorType');
@@ -285,74 +291,65 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                 <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-primary"/> Simulation End Condition</CardTitle>
                 <CardDescription>Choose what limit will stop the simulation.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
                 <FormField
                     control={form.control}
                     name="simulationMode"
                     render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                           <TooltipProvider>
-                                <FormItem>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <FormControl>
-                                                <RadioGroupItem value="ftf" id="ftf" className="peer sr-only" />
-                                            </FormControl>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Default and most realistic mode.</p></TooltipContent>
-                                    </Tooltip>
-                                    <FormLabel htmlFor="ftf" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
-                                        First-To-Fail
-                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
-                                            Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.
-                                        </FormDescription>
-                                    </FormLabel>
-                                </FormItem>
-                                <FormItem>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <FormControl>
-                                                <RadioGroupItem value="temp" id="temp" className="peer sr-only" />
-                                            </FormControl>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Isolate for thermal performance only.</p></TooltipContent>
-                                    </Tooltip>
-                                    <FormLabel htmlFor="temp" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
-                                        Temperature Limit
-                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
-                                            Stops only when the Max Junction Temp is exceeded.
-                                        </FormDescription>
-                                    </FormLabel>
-                                </FormItem>
-                               <FormItem>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <FormControl>
-                                                <RadioGroupItem value="budget" id="budget" className="peer sr-only" />
-                                            </FormControl>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Isolate for cooler performance.</p></TooltipContent>
-                                    </Tooltip>
-                                    <FormLabel htmlFor="budget" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
-                                        Cooling Budget
-                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
-                                            Stops only when power loss exceeds the cooling budget.
-                                        </FormDescription>
-                                    </FormLabel>
-                                </FormItem>
-                           </TooltipProvider>
+                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
+                           <FormItem className="flex items-center space-x-2">
+                               <FormControl>
+                                   <RadioGroupItem value="ftf" id="ftf" />
+                               </FormControl>
+                               <FormLabel htmlFor="ftf" className="font-normal text-sm">First-To-Fail</FormLabel>
+                           </FormItem>
+                           <FormItem className="flex items-center space-x-2">
+                               <FormControl>
+                                   <RadioGroupItem value="temp" id="temp" />
+                               </FormControl>
+                               <FormLabel htmlFor="temp" className="font-normal text-sm">Temperature Limit</FormLabel>
+                           </FormItem>
+                           <FormItem className="flex items-center space-x-2">
+                               <FormControl>
+                                   <RadioGroupItem value="budget" id="budget" />
+                               </FormControl>
+                               <FormLabel htmlFor="budget" className="font-normal text-sm">Cooling Budget</FormLabel>
+                           </FormItem>
                         </RadioGroup>
                     )}
                 />
+                 
+                <div className="relative min-h-[60px]">
+                    <AnimatePresence initial={false}>
+                        <motion.div
+                            key={simulationMode}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            className="p-3 bg-white/5 rounded-md border border-white/10"
+                        >
+                            <p className='text-sm text-muted-foreground'>{endConditionDescriptions[simulationMode]}</p>
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+                 
                  {simulationMode === 'budget' && (
-                    <FormField control={form.control} name="coolingBudget" render={({ field }) => (
-                        <FormItem className="mt-4">
-                            <FormLabel>Manual Cooling Budget (W)</FormLabel>
-                            <FormControl><Input type="number" placeholder={`e.g., ${selectedCoolingMethod?.coolingBudget || 250}`} {...field} /></FormControl>
-                            <FormDescription>Override the selected cooler's budget.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <FormField control={form.control} name="coolingBudget" render={({ field }) => (
+                            <FormItem className="mt-4">
+                                <FormLabel>Manual Cooling Budget (W)</FormLabel>
+                                <FormControl><Input type="number" placeholder={`e.g., ${selectedCoolingMethod?.coolingBudget || 250}`} {...field} /></FormControl>
+                                <FormDescription>Override the selected cooler's budget.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                    </motion.div>
                 )}
             </CardContent>
         </Card>
@@ -374,3 +371,4 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
+
