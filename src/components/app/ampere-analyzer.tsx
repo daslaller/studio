@@ -7,9 +7,10 @@ import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
-import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction } from '@/app/actions';
+import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction } from '@/app/actions';
 import type { SimulationResult, ExtractTransistorSpecsOutput, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
+import { AiDeepDiveAnalysisInput } from '@/ai/flows/ai-deep-dive-analysis';
 
 const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
@@ -318,6 +319,61 @@ export default function AmpereAnalyzer() {
     });
   };
 
+  const handleAiDeepDive = useCallback(async () => {
+    if (!simulationResult || !aiOptimizationSuggestions) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Need initial results to run a deep dive.' });
+        return;
+    }
+    
+    startTransition(async () => {
+        const values = form.getValues();
+        const componentName = values.predefinedComponent
+            ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
+            : values.componentName || 'N/A';
+        
+        const selectedCooling = coolingMethods.find(c => c.value === values.coolingMethod);
+        const coolingBudgetVal = values.simulationMode === 'budget' && values.coolingBudget 
+            ? values.coolingBudget 
+            : (selectedCooling?.coolingBudget || 0);
+
+        const simulationSummary = `Result: ${simulationResult.status}. Failure Reason: ${simulationResult.failureReason || 'None'}. Details: ${simulationResult.details}`;
+        
+        const initialSpecs: Partial<FormValues> = { ...values };
+        delete initialSpecs.datasheet;
+        delete initialSpecs.predefinedComponent;
+
+        const deepDiveInput: AiDeepDiveAnalysisInput = {
+            componentName,
+            coolingMethod: selectedCooling?.name || 'N/A',
+            maxTemperature: values.maxTemperature,
+            coolingBudget: coolingBudgetVal,
+            simulationResults: simulationSummary,
+            allCoolingMethods: JSON.stringify(coolingMethods),
+            initialSpecs: JSON.stringify(initialSpecs),
+        };
+
+        toast({ title: "AI Deep Dive Started", description: "The AI is running an iterative analysis to find optimal settings..." });
+        
+        const result = await runAiDeepDiveAction(deepDiveInput);
+
+        if (result.error) {
+            toast({ variant: 'destructive', title: 'AI Deep Dive Error', description: result.error });
+        } else if (result.data) {
+            // For now, just show a toast. This will be replaced with a live view.
+            toast({
+                title: "AI Deep Dive Complete",
+                description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A. ${result.data.reasoning}`,
+                duration: 9000,
+            });
+            // Here you could update the form with the new values and re-run the simulation
+            form.setValue('coolingMethod', result.data.bestCoolingMethod);
+            form.setValue('switchingFrequency', result.data.optimalFrequency);
+        }
+    });
+
+}, [simulationResult, aiOptimizationSuggestions, form, toast]);
+
+
   return (
     <div className="space-y-8">
       <header className="text-center">
@@ -345,6 +401,7 @@ export default function AmpereAnalyzer() {
                 aiOptimizationSuggestions={aiOptimizationSuggestions}
                 liveData={liveData}
                 formValues={form.getValues()}
+                onAiDeepDive={handleAiDeepDive}
             />
         </div>
       </div>

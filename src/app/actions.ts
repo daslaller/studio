@@ -5,6 +5,8 @@ import { extractTransistorSpecs } from "@/ai/flows/ai-datasheet-reader";
 import { aiCalculateExpectedResults } from "@/ai/flows/ai-calculate-expected-results";
 import { getAiOptimizationSuggestions } from "@/ai/flows/ai-optimization-advisor";
 import { findAndParseDatasheet } from "@/ai/flows/ai-datasheet-finder";
+import { runAiDeepDiveAnalysis } from "@/ai/flows/ai-deep-dive-analysis";
+import type { AiDeepDiveAnalysisInput } from "@/lib/types";
 
 
 const datasheetSchema = z.object({
@@ -74,4 +76,14 @@ export async function getAiSuggestionsAction(
     console.error(e);
     return { error: "Failed to get AI optimization suggestions." };
   }
+}
+
+export async function runAiDeepDiveAction(input: AiDeepDiveAnalysisInput) {
+    try {
+        const results = await runAiDeepDiveAnalysis(input);
+        return { data: results };
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to run AI Deep Dive analysis." };
+    }
 }

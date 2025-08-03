@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface ManualSpecs {
   transistorType: string;
   maxCurrent: string;
@@ -25,6 +27,27 @@ export interface AiOptimizationSuggestionsOutput {
   suggestions: string[];
   reasoning: string;
 }
+
+export const AiDeepDiveAnalysisInputSchema = z.object({
+  componentName: z.string().describe('The name of the component being simulated.'),
+  coolingMethod: z.string().describe('The current cooling method being used.'),
+  maxTemperature: z.number().describe('The maximum allowed temperature in degrees Celsius.'),
+  coolingBudget: z.number().describe('The cooling budget available in Watts.'),
+  simulationResults: z.string().describe('The results of the initial simulation.'),
+  allCoolingMethods: z.string().describe('A JSON string of all available cooling methods and their specs.'),
+  initialSpecs: z.string().describe('A JSON string of the initial transistor specifications.'),
+});
+export type AiDeepDiveAnalysisInput = z.infer<typeof AiDeepDiveAnalysisInputSchema>;
+
+
+export const AiDeepDiveAnalysisOutputSchema = z.object({
+    bestCoolingMethod: z.string().describe("The value for the optimal cooling method found."),
+    optimalFrequency: z.number().describe("The suggested optimal switching frequency in kHz."),
+    reasoning: z.string().describe("Detailed reasoning for why these new parameters are optimal."),
+    projectedMaxSafeCurrent: z.number().describe("The new projected max safe current in Amps with these changes."),
+});
+export type AiDeepDiveAnalysisOutput = z.infer<typeof AiDeepDiveAnalysisOutputSchema>;
+
 
 export interface SimulationResult {
   status: 'success' | 'failure';
