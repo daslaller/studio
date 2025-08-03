@@ -52,83 +52,81 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
               name="inputMode"
               render={({ field }) => (
                 <FormItem className="pt-2">
-                  <FormControl>
-                     <Tabs defaultValue={field.value} onValueChange={field.onChange} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="datasheet">Datasheet Upload</TabsTrigger>
-                            <TabsTrigger value="manual">Manual Input</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="datasheet" className="pt-4">
-                            <FormField
+                   <Tabs defaultValue={field.value} onValueChange={field.onChange} className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="datasheet">Datasheet Upload</TabsTrigger>
+                          <TabsTrigger value="manual">Manual Input</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="datasheet" className="pt-6">
+                          <FormField
+                              control={form.control}
+                              name="datasheet"
+                              render={({ field: fileField }) => (
+                                  <FormItem>
+                                      <FormLabel>Datasheet (PDF)</FormLabel>
+                                      <FormControl>
+                                          <div>
+                                              <Input
+                                                  type="file"
+                                                  accept=".pdf"
+                                                  ref={fileInputRef}
+                                                  className="hidden"
+                                                  onChange={(e) => fileField.onChange(e.target.files?.[0])}
+                                              />
+                                              <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  className="w-full justify-start text-left font-normal h-11 text-base"
+                                                  onClick={() => fileInputRef.current?.click()}
+                                              >
+                                                  <Upload className="mr-2 h-5 w-5" />
+                                                  {fileField.value ? fileField.value.name : 'Upload PDF'}
+                                              </Button>
+                                          </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </TabsContent>
+                      <TabsContent value="manual" className="pt-1">
+                          <div className="space-y-6 pt-6 p-1">
+                              <FormField
                                 control={form.control}
-                                name="datasheet"
-                                render={({ field: fileField }) => (
-                                    <FormItem>
-                                        <FormLabel>Datasheet (PDF)</FormLabel>
-                                        <FormControl>
-                                            <div>
-                                                <Input
-                                                    type="file"
-                                                    accept=".pdf"
-                                                    ref={fileInputRef}
-                                                    className="hidden"
-                                                    onChange={(e) => fileField.onChange(e.target.files?.[0])}
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="w-full justify-start text-left font-normal h-11 text-base"
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                >
-                                                    <Upload className="mr-2 h-5 w-5" />
-                                                    {fileField.value ? fileField.value.name : 'Upload PDF'}
-                                                </Button>
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                name="maxCurrent"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>Max Current (A)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 8" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
                                 )}
-                            />
-                        </TabsContent>
-                        <TabsContent value="manual">
-                            <div className="space-y-6 pt-6">
-                                <FormField
-                                  control={form.control}
-                                  name="maxCurrent"
-                                  render={({ field: manualField }) => (
-                                    <FormItem>
-                                      <FormLabel>Max Current (A)</FormLabel>
-                                      <FormControl><Input type="number" step="any" placeholder="e.g., 8" {...manualField} /></FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name="maxVoltage"
-                                  render={({ field: manualField }) => (
-                                    <FormItem>
-                                      <FormLabel>Max Voltage (V)</FormLabel>
-                                      <FormControl><Input type="number" step="any" placeholder="e.g., 30" {...manualField} /></FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name="powerDissipation"
-                                  render={({ field: manualField }) => (
-                                    <FormItem>
-                                      <FormLabel>Power Dissipation (W)</FormLabel>
-                                      <FormControl><Input type="number" step="any" placeholder="e.g., 0.625" {...manualField} /></FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                            </div>
-                        </TabsContent>
-                     </Tabs>
-                  </FormControl>
+                              />
+                              <FormField
+                                control={form.control}
+                                name="maxVoltage"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>Max Voltage (V)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 30" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="powerDissipation"
+                                render={({ field: manualField }) => (
+                                  <FormItem>
+                                    <FormLabel>Power Dissipation (W)</FormLabel>
+                                    <FormControl><Input type="number" step="any" placeholder="e.g., 0.625" {...manualField} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                          </div>
+                      </TabsContent>
+                   </Tabs>
                 </FormItem>
               )}
             />
