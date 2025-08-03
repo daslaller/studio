@@ -51,7 +51,7 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                 <FormItem>
                   <FormLabel>Datasheet (PDF)</FormLabel>
                   <FormControl>
-                    <>
+                    <div>
                       <Input
                         type="file"
                         accept=".pdf"
@@ -68,7 +68,7 @@ export default function SimulationForm({ form, onSubmit, isPending }: Simulation
                         <Upload className="mr-2 h-4 w-4" />
                         {field.value ? field.value.name : 'Upload PDF'}
                       </Button>
-                    </>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
