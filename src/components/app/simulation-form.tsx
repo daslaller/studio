@@ -318,19 +318,19 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                     render={({ field }) => (
                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-3 gap-x-2 gap-y-2">
                            <FormItem className="flex flex-col items-center space-y-2">
-                               <FormLabel htmlFor="ftf" className="font-normal cursor-pointer text-[0.6rem] whitespace-nowrap">First-To-Fail</FormLabel>
+                               <FormLabel htmlFor="ftf" className="font-normal cursor-pointer text-xs whitespace-nowrap">First-To-Fail</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="ftf" id="ftf" />
                                </FormControl>
                            </FormItem>
                            <FormItem className="flex flex-col items-center space-y-2">
-                               <FormLabel htmlFor="temp" className="font-normal cursor-pointer text-[0.6rem] whitespace-nowrap">Temp Limit</FormLabel>
+                               <FormLabel htmlFor="temp" className="font-normal cursor-pointer text-xs whitespace-nowrap">Temp Limit</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="temp" id="temp" />
                                </FormControl>
                            </FormItem>
                            <FormItem className="flex flex-col items-center space-y-2">
-                                <FormLabel htmlFor="budget" className="font-normal cursor-pointer text-[0.6rem] whitespace-nowrap">Cooling Budget</FormLabel>
+                                <FormLabel htmlFor="budget" className="font-normal cursor-pointer text-xs whitespace-nowrap">Cooling Budget</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="budget" id="budget" />
                                </FormControl>
