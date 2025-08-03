@@ -1,25 +1,41 @@
 import type { CoolingMethod, PredefinedTransistor } from './types';
 
 export const coolingMethods: CoolingMethod[] = [
-  // Air Cooling
-  { name: 'Basic Air Cooling', value: 'air-basic', thermalResistance: 5.0, coolingBudget: 20 },
-  { name: 'Tower Air Cooler', value: 'air-tower', thermalResistance: 1.5, coolingBudget: 45 },
-  { name: 'Low Profile Air Cooler', value: 'air-low-profile', thermalResistance: 3.0, coolingBudget: 30 },
-  { name: 'Premium Air Cooler', value: 'air-premium', thermalResistance: 1.2, coolingBudget: 60 },
-  { name: 'Industrial Heatsink', value: 'air-industrial', thermalResistance: 2.5, coolingBudget: 40 },
+  // Air Cooling - Low Profile
+  { name: 'Noctua NH-L9i/a', value: 'air-nh-l9', thermalResistance: 3.5, coolingBudget: 95 },
+  { name: 'Cryorig C7', value: 'air-c7', thermalResistance: 3.2, coolingBudget: 100 },
+  { name: 'Scythe Big Shuriken 3', value: 'air-shuriken-3', thermalResistance: 2.8, coolingBudget: 125 },
+
+  // Air Cooling - Mid-Range Tower
+  { name: 'Cooler Master Hyper 212 EVO', value: 'air-hyper-212', thermalResistance: 2.0, coolingBudget: 150 },
+  { name: 'be quiet! Pure Rock 2', value: 'air-pure-rock-2', thermalResistance: 1.8, coolingBudget: 150 },
+  { name: 'ARCTIC Freezer 34 eSports DUO', value: 'air-freezer-34', thermalResistance: 1.6, coolingBudget: 210 },
+  
+  // Air Cooling - High-End Tower
+  { name: 'Noctua NH-D15', value: 'air-nh-d15', thermalResistance: 1.1, coolingBudget: 220 },
+  { name: 'be quiet! Dark Rock Pro 4', value: 'air-dark-rock-pro-4', thermalResistance: 1.0, coolingBudget: 250 },
+  { name: 'Deepcool Assassin IV', value: 'air-assassin-iv', thermalResistance: 0.95, coolingBudget: 280 },
+  
   // AIO Water Cooling
-  { name: '120mm AIO', value: 'aio-120', thermalResistance: 0.8, coolingBudget: 150 },
-  { name: '240mm AIO', value: 'aio-240', thermalResistance: 0.5, coolingBudget: 250 },
-  { name: '280mm AIO', value: 'aio-280', thermalResistance: 0.4, coolingBudget: 300 },
-  { name: '360mm AIO', value: 'aio-360', thermalResistance: 0.3, coolingBudget: 350 },
+  { name: 'Corsair H60 (120mm)', value: 'aio-120-h60', thermalResistance: 0.8, coolingBudget: 170 },
+  { name: 'ARCTIC Liquid Freezer III (240mm)', value: 'aio-240-lf3', thermalResistance: 0.5, coolingBudget: 280 },
+  { name: 'Corsair H115i (280mm)', value: 'aio-280-h115i', thermalResistance: 0.45, coolingBudget: 320 },
+  { name: 'Lian Li Galahad (360mm)', value: 'aio-360-galahad', thermalResistance: 0.35, coolingBudget: 360 },
+  { name: 'EK-Nucleus AIO CR360 Lux (360mm)', value: 'aio-360-ek-nucleus', thermalResistance: 0.3, coolingBudget: 400 },
+  { name: 'ARCTIC Liquid Freezer III (420mm)', value: 'aio-420-lf3', thermalResistance: 0.25, coolingBudget: 450 },
+
   // Custom Water Cooling
-  { name: 'Basic Custom Loop', value: 'custom-loop-basic', thermalResistance: 0.25, coolingBudget: 500 },
-  { name: 'Premium Custom Loop', value: 'custom-loop-premium', thermalResistance: 0.08, coolingBudget: 1000 },
-  { name: 'Extreme Custom Loop', value: 'custom-loop-extreme', thermalResistance: 0.05, coolingBudget: 1500 },
-  // Exotic Cooling
-  { name: 'Thermoelectric Cooler (TEC)', value: 'exotic-tec', thermalResistance: 0.15, coolingBudget: 800 },
-  { name: 'Phase Change Cooling', value: 'exotic-phase-change', thermalResistance: 0.02, coolingBudget: 2000 },
-  { name: 'Liquid Nitrogen (LN2)', value: 'exotic-ln2', thermalResistance: 0.001, coolingBudget: 5000 },
+  { name: 'Custom Loop (Single 240mm Slim Rad)', value: 'custom-loop-single-240', thermalResistance: 0.28, coolingBudget: 450 },
+  { name: 'Custom Loop (Single 360mm Thick Rad)', value: 'custom-loop-single-360', thermalResistance: 0.15, coolingBudget: 700 },
+  { name: 'Custom Loop (Dual 360mm Rads)', value: 'custom-loop-dual-360', thermalResistance: 0.08, coolingBudget: 1200 },
+  { name: 'Custom Loop (Dual 480mm Rads)', value: 'custom-loop-dual-480', thermalResistance: 0.06, coolingBudget: 1500 },
+  { name: 'Extreme Custom Loop (Triple+ Rads)', value: 'custom-loop-extreme', thermalResistance: 0.04, coolingBudget: 2000 },
+
+  // Exotic & Industrial Cooling
+  { name: 'Industrial Heatsink (Large Passive)', value: 'industrial-passive', thermalResistance: 4.0, coolingBudget: 50 },
+  { name: 'Thermoelectric Cooler (TEC/Peltier)', value: 'exotic-tec', thermalResistance: 0.15, coolingBudget: 800 },
+  { name: 'Phase Change Cooling', value: 'exotic-phase-change', thermalResistance: 0.02, coolingBudget: 2500 },
+  { name: 'Liquid Nitrogen (LN2 Pot)', value: 'exotic-ln2', thermalResistance: 0.001, coolingBudget: 5000 },
 ];
 
 
@@ -115,5 +131,3 @@ export const transistorTypes = [
     'BJT (NPN)',
     'BJT (PNP)'
 ];
-
-    
