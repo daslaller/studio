@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export interface ManualSpecs {
@@ -80,6 +81,8 @@ export interface LiveDataPoint {
     current: number;
     temperature: number;
     powerLoss: number;
+    conductionLoss: number;
+    switchingLoss: number;
     progress: number;
     limitValue: number;
 }
@@ -89,4 +92,12 @@ export interface AiDeepDiveStep {
   description: string;
   simulationParams: any;
   simulationResult: SimulationResult | null;
+}
+
+export interface HistoryEntry {
+  id: string;
+  componentName: string;
+  timestamp: string;
+  simulationResult: SimulationResult;
+  formValues: any; // Store form values for potential re-run
 }

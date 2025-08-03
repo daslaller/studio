@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useTransition, useCallback } from 'react';
+import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,8 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
 import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction } from '@/app/actions';
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep } from '@/lib/types';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import HistoryView from './history-view';
 
 const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
@@ -73,6 +75,40 @@ export default function AmpereAnalyzer() {
   const [isDeepDiveRunning, setIsDeepDiveRunning] = useState(false);
   const [deepDiveSteps, setDeepDiveSteps] = useState<AiDeepDiveStep[]>([]);
   const [currentDeepDiveStep, setCurrentDeepDiveStep] = useState(0);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const resultsRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    try {
+      const savedHistory = localStorage.getItem('simulationHistory');
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory));
+      }
+    } catch (error) {
+        console.error("Could not load history from localStorage", error);
+    }
+  }, []);
+
+  const addToHistory = (entry: HistoryEntry) => {
+    const newHistory = [entry, ...history].slice(0, 50); // Keep last 50 results
+    setHistory(newHistory);
+    try {
+      localStorage.setItem('simulationHistory', JSON.stringify(newHistory));
+    } catch (error) {
+       console.error("Could not save history to localStorage", error);
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem('simulationHistory');
+    } catch (error) {
+      console.error("Could not clear history from localStorage", error);
+    }
+  }
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -87,6 +123,12 @@ export default function AmpereAnalyzer() {
       simulationMode: 'ftf',
     },
   });
+  
+  const scrollToResults = () => {
+    setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
   const handleTransistorSelect = (value: string) => {
     const transistor = predefinedTransistors.find(t => t.value === value);
@@ -248,6 +290,8 @@ export default function AmpereAnalyzer() {
               current,
               temperature: finalTemperature,
               powerLoss: totalLoss,
+              conductionLoss: powerLoss.conduction,
+              switchingLoss: powerLoss.switching,
               progress: Math.min(progress, 100),
               limitValue
           };
@@ -276,6 +320,7 @@ export default function AmpereAnalyzer() {
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
       setLiveData([]);
+      scrollToResults();
 
       const componentName = values.predefinedComponent 
         ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
@@ -303,6 +348,15 @@ export default function AmpereAnalyzer() {
       const simulationSummary = `Result: ${simResult.status}. Failure Reason: ${simResult.failureReason || 'None'}. Details: ${simResult.details}`;
       const selectedCooling = coolingMethods.find(c => c.value === values.coolingMethod);
       const coolingBudgetVal = values.simulationMode === 'budget' && values.coolingBudget ? values.coolingBudget : (selectedCooling?.coolingBudget || 0);
+      
+      const historyEntry: HistoryEntry = {
+        id: new Date().toISOString(),
+        componentName,
+        timestamp: new Date().toISOString(),
+        simulationResult: simResult,
+        formValues: values,
+      };
+      addToHistory(historyEntry);
 
       const [aiCalculations, aiSuggestions] = await Promise.all([
         getAiCalculationsAction(componentName, datasheetContentForAi),
@@ -344,6 +398,7 @@ export default function AmpereAnalyzer() {
         setCurrentDeepDiveStep(0);
         setDeepDiveSteps([]);
         setLiveData([]);
+        scrollToResults();
 
         const values = form.getValues();
         const componentName = values.predefinedComponent
@@ -436,13 +491,25 @@ export default function AmpereAnalyzer() {
             description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A.`,
             duration: 9000,
         });
+        
+        const finalDiveResult = simulationSteps[simulationSteps.length-2].simulationResult;
+        if (finalDiveResult) {
+            const historyEntry: HistoryEntry = {
+                id: new Date().toISOString(),
+                componentName: `${componentName} (AI Optimized)`,
+                timestamp: new Date().toISOString(),
+                simulationResult: finalDiveResult,
+                formValues: { ...values, coolingMethod: result.data.bestCoolingMethod, switchingFrequency: result.data.optimalFrequency },
+            };
+            addToHistory(historyEntry);
+        }
 
         form.setValue('coolingMethod', result.data.bestCoolingMethod);
         form.setValue('switchingFrequency', result.data.optimalFrequency);
         setIsDeepDiveRunning(false);
     });
 
-}, [simulationResult, aiOptimizationSuggestions, form, toast, runDeepDiveSimulation]);
+}, [simulationResult, aiOptimizationSuggestions, form, toast, runDeepDiveSimulation, history]);
 
 
   return (
@@ -453,32 +520,45 @@ export default function AmpereAnalyzer() {
           Advanced power transistor analysis with multi-variable thermal simulation.
         </p>
       </header>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-        <div className="md:col-span-2">
-            <SimulationForm 
-              form={form} 
-              onSubmit={onSubmit} 
-              isPending={isPending} 
-              onTransistorSelect={handleTransistorSelect}
-              onDatasheetLookup={handleDatasheetLookup}
-              setDatasheetFile={setDatasheetFile}
-            />
-        </div>
-        <div className="md:col-span-3">
-            <ResultsDisplay
-                isLoading={isPending}
-                simulationResult={simulationResult}
-                aiCalculatedResults={aiCalculatedResults}
-                aiOptimizationSuggestions={aiOptimizationSuggestions}
-                liveData={liveData}
-                formValues={form.getValues()}
-                onAiDeepDive={handleAiDeepDive}
-                isDeepDiveRunning={isDeepDiveRunning}
-                deepDiveSteps={deepDiveSteps}
-                currentDeepDiveStep={currentDeepDiveStep}
-            />
-        </div>
-      </div>
+      <Tabs defaultValue='analyzer' className='w-full'>
+        <TabsList className='grid w-full grid-cols-2'>
+            <TabsTrigger value="analyzer">Analyzer</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="analyzer">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mt-6">
+                <div className="md:col-span-2">
+                    <SimulationForm 
+                    form={form} 
+                    onSubmit={onSubmit} 
+                    isPending={isPending} 
+                    onTransistorSelect={handleTransistorSelect}
+                    onDatasheetLookup={handleDatasheetLookup}
+                    setDatasheetFile={setDatasheetFile}
+                    />
+                </div>
+                <div className="md:col-span-3" ref={resultsRef}>
+                    <ResultsDisplay
+                        isLoading={isPending}
+                        simulationResult={simulationResult}
+                        aiCalculatedResults={aiCalculatedResults}
+                        aiOptimizationSuggestions={aiOptimizationSuggestions}
+                        liveData={liveData}
+                        formValues={form.getValues()}
+                        onAiDeepDive={handleAiDeepDive}
+                        isDeepDiveRunning={isDeepDiveRunning}
+                        deepDiveSteps={deepDiveSteps}
+                        currentDeepDiveStep={currentDeepDiveStep}
+                    />
+                </div>
+            </div>
+        </TabsContent>
+         <TabsContent value="history">
+            <HistoryView history={history} clearHistory={clearHistory} />
+        </TabsContent>
+      </Tabs>
+      
     </div>
   );
 }
+

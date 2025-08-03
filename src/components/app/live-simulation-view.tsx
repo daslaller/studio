@@ -1,25 +1,18 @@
+
 "use client";
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import type { LiveDataPoint } from '@/lib/types';
-import { Gauge, Power, Thermometer, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 interface LiveSimulationViewProps {
   liveData: LiveDataPoint[];
   simulationMode: 'ftf' | 'temp' | 'budget';
   maxTemperature: number;
 }
-
-const LiveMetric = ({ icon: Icon, label, value, unit, colorClass }: { icon: React.ElementType, label: string, value: string, unit: string, colorClass: string }) => (
-    <div className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-lg text-center">
-        <Icon className={`h-8 w-8 mb-2 ${colorClass}`} />
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-sm text-muted-foreground">{label} ({unit})</p>
-    </div>
-);
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -35,7 +28,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function LiveSimulationView({ liveData, simulationMode, maxTemperature }: LiveSimulationViewProps) {
-    const lastPoint = liveData.length > 0 ? liveData[liveData.length - 1] : null;
+    const lastPoint = liveData.length > 0 ? liveData[liveData.length - 1] : {
+        current: 0,
+        temperature: 0,
+        powerLoss: 0,
+        conductionLoss: 0,
+        switchingLoss: 0,
+        progress: 0,
+    };
     const progress = lastPoint ? lastPoint.progress : 0;
     
     const progressLabelMap = {
@@ -49,15 +49,32 @@ export default function LiveSimulationView({ liveData, simulationMode, maxTemper
         temp: `Test will stop when junction temperature exceeds ${maxTemperature}°C.`,
         budget: `Test will stop when total power loss exceeds the defined cooling budget.`
     };
+
+    const barChartData = [
+        { name: 'Current', value: lastPoint.current, fill: 'var(--color-green)' },
+        { name: 'Junction Temp', value: lastPoint.temperature, fill: 'var(--color-orange)' },
+        { name: 'Total Heat', value: lastPoint.powerLoss, fill: 'var(--color-red)' },
+        { name: 'Conduction Loss', value: lastPoint.conductionLoss, fill: 'var(--color-purple)' },
+        { name: 'Switching Loss', value: lastPoint.switchingLoss, fill: 'var(--color-pink)' },
+    ];
     
     return (
         <Card className="h-full">
+            <style jsx global>{`
+                :root {
+                    --color-green: #4ade80;
+                    --color-orange: #fb923c;
+                    --color-red: #f87171;
+                    --color-purple: #a78bfa;
+                    --color-pink: #f472b6;
+                }
+            `}</style>
             <CardHeader>
                 <CardTitle>Live Analysis</CardTitle>
                 <CardDescription>Visualizing simulation progress in real-time...</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="w-full h-60">
+                <div className="w-full h-52">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                             data={liveData}
@@ -99,11 +116,17 @@ export default function LiveSimulationView({ liveData, simulationMode, maxTemper
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                    <LiveMetric icon={Gauge} label="Current" value={lastPoint?.current.toFixed(2) ?? '0.00'} unit="A" colorClass="text-green-400" />
-                    <LiveMetric icon={Thermometer} label="Junction Temp" value={lastPoint?.temperature.toFixed(2) ?? '0.00'} unit="°C" colorClass="text-orange-400" />
-                    <LiveMetric icon={Power} label="Power Loss" value={lastPoint?.powerLoss.toFixed(2) ?? '0.00'} unit="W" colorClass="text-red-400" />
+                
+                 <div className="w-full h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 20, left: 50, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" />
+                            <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12}/>
+                            <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={100} />
+                            <Tooltip cursor={{fill: 'hsl(var(--muted) / 0.5)'}} contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                            <Bar dataKey="value" isAnimationActive={false} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
                 
                 <div>
