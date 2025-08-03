@@ -114,7 +114,7 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
           <CardHeader>
             <CardTitle>AI Optimization Advisor</CardTitle>
             <CardDescription>Suggestions to improve performance.</CardDescription>
-          </Header>
+          </CardHeader>
           <CardContent className="space-y-4">
             <ul className="space-y-2">
               {aiOptimizationSuggestions.suggestions.map((suggestion, index) => (
