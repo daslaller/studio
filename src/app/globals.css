@@ -14,54 +14,54 @@ body {
     --card-foreground: 210 40% 98%;
     --popover: 224 71% 4%;
     --popover-foreground: 210 40% 98%;
-    --primary: 221 83% 53%; /* Ultramarine Blue */
+    --primary: 221 83% 53%; /* blue-600 */
     --primary-foreground: 210 40% 98%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 142 76% 40%; /* Light Green */
+    --accent: 330 83% 60%; /* pink-600 */
     --accent-foreground: 24 9.8% 10%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 22.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 142 76% 40%; /* Light Green Ring */
-    --chart-1: 221 83% 53%; /* Ultramarine Blue */
-    --chart-2: 142 76% 40%; /* Light Green */
-    --chart-3: 173 58% 39%; /* Tealish Green */
+    --ring: 330 83% 60%; /* pink-600 Ring */
+    --chart-1: 221 83% 53%; /* blue */
+    --chart-2: 330 83% 60%; /* pink */
+    --chart-3: 271 82% 56%; /* purple */
     --chart-4: 217 91% 65%; /* Bright Blue */
-    --chart-5: 142 63% 55%; /* Softer Green */
+    --chart-5: 330 83% 70%; /* Lighter Pink */
     --radius: 0.75rem;
 
     /* Default gradient colors, will be overridden by JS */
-    --gradient-color-1: #4A00E0;
-    --gradient-color-2: #8E2DE2;
-    --gradient-color-3: #FF0080;
+    --gradient-color-1: #9333EA;
+    --gradient-color-2: #2563EB;
+    --gradient-color-3: #EC4899;
   }
   .dark {
     --background: 224 71% 4%;
     --foreground: 210 40% 98%;
     --card: 224 71% 15%;
     --card-foreground: 210 40% 98%;
-    --primary: 221 83% 53%; /* Ultramarine Blue */
+    --primary: 221 83% 53%; /* blue-600 */
     --primary-foreground: 210 40% 98%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 142 76% 40%; /* Light Green */
+    --accent: 330 83% 60%; /* pink-600 */
     --accent-foreground: 24 9.8% 10%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 22.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 142 76% 40%; /* Light Green Ring */
-    --chart-1: 221 83% 53%; /* Ultramarine Blue */
-    --chart-2: 142 76% 40%; /* Light Green */
-    --chart-3: 173 58% 39%; /* Tealish Green */
+    --ring: 330 83% 60%; /* pink-600 Ring */
+    --chart-1: 221 83% 53%; /* blue */
+    --chart-2: 330 83% 60%; /* pink */
+    --chart-3: 271 82% 56%; /* purple */
     --chart-4: 217 91% 65%; /* Bright Blue */
-    --chart-5: 142 63% 55%; /* Softer Green */
+    --chart-5: 330 83% 70%; /* Lighter Pink */
   }
 }
 

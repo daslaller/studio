@@ -5,14 +5,12 @@ import { useEffect, useState } from 'react';
 
 // A more vivid and saturated color palette for the background gradient
 const vibrantColors = [
-  '#4A00E0', // Vibrant Blue-Purple
-  '#8E2DE2', // Bright Purple
-  '#FF0080', // Electric Pink
-  '#00F260', // Neon Green
-  '#0575E6', // Strong Blue
-  '#f27121', // Bright Orange
-  '#e94057', // Strong Pink
-  '#8A2387', // Deep Magenta
+  '#9333ea', // purple-600
+  '#2563eb', // blue-600
+  '#ec4899', // pink-600
+  '#f59e0b', // amber-500
+  '#10b981', // emerald-500
+  '#ef4444', // red-500
 ];
 
 
