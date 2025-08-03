@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power, Package, ShieldAlert } from 'lucide-react';
 import React from "react";
 
 interface ResultsDisplayProps {
@@ -65,7 +65,8 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
     Thermal: Thermometer,
     Current: Gauge,
     Voltage: Zap,
-    'Power Loss': Power,
+    'Power Dissipation': Package,
+    'Cooling Budget': ShieldAlert,
   };
   const FailureIcon = simulationResult.failureReason ? failureIcons[simulationResult.failureReason] || AlertTriangle : AlertTriangle;
 
@@ -133,3 +134,5 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
     </div>
   );
 }
+
+    

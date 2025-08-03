@@ -8,6 +8,7 @@ export interface ManualSpecs {
   riseTime: string;
   fallTime: string;
   rthJC: string; // Thermal resistance from junction to case
+  maxTemperature: string;
 }
 
 export interface ExtractTransistorSpecsOutput extends ManualSpecs {
@@ -28,7 +29,7 @@ export interface AiOptimizationSuggestionsOutput {
 export interface SimulationResult {
   status: 'success' | 'failure';
   maxSafeCurrent: number;
-  failureReason: 'Thermal' | 'Voltage' | 'Current' | 'Power Loss' | null;
+  failureReason: 'Thermal' | 'Voltage' | 'Current' | 'Power Dissipation' | 'Cooling Budget' | null;
   details: string;
   finalTemperature: number;
   powerDissipation: {
@@ -50,3 +51,5 @@ export type PredefinedTransistor = {
   value: string;
   specs: ManualSpecs;
 };
+
+    
