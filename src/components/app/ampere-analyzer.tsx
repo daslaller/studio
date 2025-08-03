@@ -30,11 +30,12 @@ const formSchema = z.object({
   riseTime: z.coerce.number().positive(), // ns
   fallTime: z.coerce.number().positive(), // ns
   rthJC: z.coerce.number().positive("Junction-to-Case Thermal Resistance is required."), // °C/W
+  maxTemperature: z.coerce.number().positive(),
+
 
   // Simulation Constraints
   simulationMode: z.enum(['ftf', 'temp', 'budget']).default('ftf'),
   switchingFrequency: z.coerce.number().positive(), // kHz
-  maxTemperature: z.coerce.number().positive(),
   coolingMethod: z.string().min(1, 'Please select a cooling method'),
   ambientTemperature: z.coerce.number().default(25),
   
@@ -71,8 +72,10 @@ export default function AmpereAnalyzer() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      predefinedComponent: '',
+      componentName: '',
       maxTemperature: 150,
-      coolingMethod: 'air-tower',
+      coolingMethod: 'air-nh-d15',
       switchingFrequency: 100,
       ambientTemperature: 25,
       transistorType: 'MOSFET (N-Channel)',
@@ -137,8 +140,10 @@ export default function AmpereAnalyzer() {
         
         if (isMosfetType(type)) {
             form.setValue('rdsOn', parseFloat(data.rdsOn) || 0);
+            form.setValue('vceSat', undefined);
         } else {
             form.setValue('vceSat', parseFloat(data.vceSat) || 0);
+            form.setValue('rdsOn', undefined);
         }
         
         const toastTitle = source === 'pdf' ? 'Datasheet Parsed' : 'AI Analysis Complete';
@@ -159,7 +164,6 @@ export default function AmpereAnalyzer() {
 
       const selectedCooling = coolingMethods.find(c => c.value === coolingMethod) as CoolingMethod;
       const totalRth = rthJC + selectedCooling.thermalResistance;
-      const effectiveCoolingBudget = simulationMode === 'budget' && coolingBudget ? coolingBudget : selectedCooling.coolingBudget;
       
       const rdsOnOhms = (rdsOn || 0) / 1000;
       const fSwHz = switchingFrequency * 1000;
@@ -183,6 +187,7 @@ export default function AmpereAnalyzer() {
           powerLoss = { total: totalLoss, conduction: conductionLoss, switching: switchingLoss };
           const tempRise = totalLoss * totalRth;
           finalTemperature = ambientTemperature + tempRise;
+          const effectiveCoolingBudget = (simulationMode === 'budget' && coolingBudget) ? coolingBudget : selectedCooling.coolingBudget;
 
           // Check failure conditions based on simulation mode
           let fail = false;
@@ -199,7 +204,22 @@ export default function AmpereAnalyzer() {
           
           if (fail) {
               maxSafeCurrent = current - step;
-              return { status: 'failure', maxSafeCurrent, failureReason, details, finalTemperature, powerDissipation: powerLoss };
+              // Recalculate final stats for the last safe current
+              const lastSafeConductionLoss = isMosfetType(transistorType)
+                  ? Math.pow(maxSafeCurrent, 2) * rdsOnOhms * 0.5
+                  : maxSafeCurrent * (vceSat || 0) * 0.5;
+              const lastSafeSwitchingLoss = 0.5 * maxVoltage * maxSafeCurrent * tSwitchingSec * fSwHz;
+              const lastSafeTotalLoss = lastSafeConductionLoss + lastSafeSwitchingLoss;
+              const lastSafeTempRise = lastSafeTotalLoss * totalRth;
+              
+              return { 
+                  status: 'failure', 
+                  maxSafeCurrent, 
+                  failureReason, 
+                  details, 
+                  finalTemperature: ambientTemperature + lastSafeTempRise, 
+                  powerDissipation: { total: lastSafeTotalLoss, conduction: lastSafeConductionLoss, switching: lastSafeSwitchingLoss } 
+              };
           }
           
           maxSafeCurrent = current;
@@ -216,7 +236,6 @@ export default function AmpereAnalyzer() {
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
 
-      let specsForAi: Partial<ManualSpecs> = {};
       const componentName = values.predefinedComponent 
         ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
         : values.componentName || 'N/A';
@@ -226,7 +245,7 @@ export default function AmpereAnalyzer() {
         return;
       }
 
-      specsForAi = {
+      let specsForAi: Partial<ManualSpecs> = {
           maxCurrent: String(values.maxCurrent),
           maxVoltage: String(values.maxVoltage),
           powerDissipation: String(values.powerDissipation),
@@ -241,7 +260,7 @@ export default function AmpereAnalyzer() {
 
       const simulationSummary = `Result: ${simResult.status}. Failure Reason: ${simResult.failureReason || 'None'}. Details: ${simResult.details}`;
       const selectedCooling = coolingMethods.find(c => c.value === values.coolingMethod);
-      const coolingBudget = selectedCooling?.coolingBudget || 0;
+      const coolingBudget = values.simulationMode === 'budget' && values.coolingBudget ? values.coolingBudget : (selectedCooling?.coolingBudget || 0);
 
       const [aiCalculations, aiSuggestions] = await Promise.all([
         getAiCalculationsAction(componentName, datasheetContentForAi),
@@ -293,3 +312,5 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
