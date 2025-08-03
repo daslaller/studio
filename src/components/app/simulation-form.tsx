@@ -316,24 +316,24 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                     control={form.control}
                     name="simulationMode"
                     render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
-                           <FormItem className="flex items-center space-x-2">
+                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-3 gap-x-2 gap-y-2">
+                           <FormItem className="flex flex-col items-center space-y-2">
+                               <FormLabel htmlFor="ftf" className="font-normal cursor-pointer text-xs">First-To-Fail</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="ftf" id="ftf" />
                                </FormControl>
-                               <FormLabel htmlFor="ftf" className="font-normal text-xs">First-To-Fail</FormLabel>
                            </FormItem>
-                           <FormItem className="flex items-center space-x-2">
+                           <FormItem className="flex flex-col items-center space-y-2">
+                               <FormLabel htmlFor="temp" className="font-normal cursor-pointer text-xs">Temp Limit</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="temp" id="temp" />
                                </FormControl>
-                               <FormLabel htmlFor="temp" className="font-normal text-xs">Temp Limit</FormLabel>
                            </FormItem>
-                           <FormItem className="flex items-center space-x-2">
+                           <FormItem className="flex flex-col items-center space-y-2">
+                                <FormLabel htmlFor="budget" className="font-normal cursor-pointer text-xs">Cooling Budget</FormLabel>
                                <FormControl>
                                    <RadioGroupItem value="budget" id="budget" />
                                </FormControl>
-                               <FormLabel htmlFor="budget" className="font-normal text-xs">Cooling Budget</FormLabel>
                            </FormItem>
                         </RadioGroup>
                     )}
