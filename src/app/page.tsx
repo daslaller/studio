@@ -8,9 +8,6 @@ const vibrantColors = [
   '#9333ea', // purple-600
   '#2563eb', // blue-600
   '#ec4899', // pink-600
-  '#f59e0b', // amber-500
-  '#10b981', // emerald-500
-  '#ef4444', // red-500
 ];
 
 

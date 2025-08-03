@@ -18,9 +18,20 @@ export interface ManualSpecs {
 export interface ExtractTransistorSpecsOutput extends ManualSpecs {}
 
 export interface FindDatasheetOutput {
-    foundDatasheetName?: string;
-    bestEffort: ManualSpecs;
+    foundDatasheetName: string;
+    keyParameters: {
+        maxCurrent: string;
+        maxVoltage: string;
+        rdsOn: string;
+        vceSat: string;
+    }
 }
+
+export interface GetBestEffortSpecsOutput extends ManualSpecs {
+    confidence: 'High' | 'Medium' | 'Low';
+    sources: string;
+}
+
 
 export interface AiCalculatedExpectedResultsOutput {
   expectedMaxCurrent: number;

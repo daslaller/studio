@@ -8,13 +8,14 @@ import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
-import { findDatasheetAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction, extractSpecsFromDatasheetAction } from '@/app/actions';
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput } from '@/lib/types';
+import { findDatasheetAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction, extractSpecsFromDatasheetAction, getBestEffortSpecsAction } from '@/app/actions';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput, GetBestEffortSpecsOutput } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import HistoryView from './history-view';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { FileText, Search } from 'lucide-react';
+import { FileText, Search, Bot } from 'lucide-react';
+import { Button } from '../ui/button';
 
 const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
@@ -65,6 +66,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type DialogState = 
+    | { type: 'idle' }
+    | { type: 'datasheet_found'; data: FindDatasheetOutput }
+    | { type: 'no_datasheet_found' }
+    | { type: 'best_effort_found'; data: GetBestEffortSpecsOutput };
+
+
 export default function AmpereAnalyzer() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -78,8 +86,7 @@ export default function AmpereAnalyzer() {
   const [deepDiveSteps, setDeepDiveSteps] = useState<AiDeepDiveStep[]>([]);
   const [currentDeepDiveStep, setCurrentDeepDiveStep] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [aiSearchResult, setAiSearchResult] = useState<FindDatasheetOutput | null>(null);
-  const [isDialogVisible, setIsDialogVisible] = useState(false);
+  const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -135,7 +142,7 @@ export default function AmpereAnalyzer() {
     }, 100);
   };
   
-  const populateFormWithSpecs = useCallback((specs: ManualSpecs | ExtractTransistorSpecsOutput) => {
+  const populateFormWithSpecs = useCallback((specs: ManualSpecs | ExtractTransistorSpecsOutput | GetBestEffortSpecsOutput) => {
       form.setValue('maxCurrent', parseFloat(specs.maxCurrent) || 0);
       form.setValue('maxVoltage', parseFloat(specs.maxVoltage) || 0);
       form.setValue('powerDissipation', parseFloat(specs.powerDissipation) || 0);
@@ -195,8 +202,8 @@ export default function AmpereAnalyzer() {
         return;
       }
 
-      // Otherwise, use the AI to find one online.
-      toast({ title: 'AI Datasheet Search', description: 'The AI is looking for your component...' });
+      // Stage 1: Strictly look for a datasheet PDF.
+      toast({ title: 'AI Datasheet Search', description: 'The AI is looking for an official datasheet PDF...' });
       const formData = new FormData();
       formData.append('componentName', componentName);
       
@@ -205,39 +212,31 @@ export default function AmpereAnalyzer() {
       if (result.error) {
         toast({ variant: 'destructive', title: 'AI Search Error', description: result.error });
       } else if (result.data) {
-        setAiSearchResult(result.data);
-        if (result.data.foundDatasheetName) {
-            // If a datasheet is found, open the confirmation dialog
-            setIsDialogVisible(true);
-        } else {
-            // If no datasheet found, use best effort and notify user
-            populateFormWithSpecs(result.data.bestEffort);
-            toast({
-                title: "AI Analysis Complete",
-                description: "Could not find a specific datasheet. Populating with AI's best-effort estimation.",
-                duration: 7000,
-            });
-        }
+        // Datasheet found, show confirmation dialog.
+        setDialogState({ type: 'datasheet_found', data: result.data });
+      } else {
+        // No datasheet found, trigger the "no_datasheet_found" dialog.
+        setDialogState({ type: 'no_datasheet_found' });
       }
     });
   }, [form, datasheetFile, toast, populateFormWithSpecs]);
 
-  const handleDialogAction = (action: 'parse' | 'best_effort') => {
-      setIsDialogVisible(false);
-      if (!aiSearchResult) return;
+  const handleBestEffortSearch = useCallback(async () => {
+    const componentName = form.getValues('componentName');
+    if (!componentName) return;
 
-      if (action === 'parse') {
-          // This part is now hypothetical, as we can't actually download and parse the "found" PDF.
-          // In a real scenario, we'd fetch the PDF here. For now, we'll use the bestEffort data
-          // as if it were the parsed result.
-          toast({ title: "Parsing Datasheet...", description: `Using data found for ${aiSearchResult.foundDatasheetName}` });
-          populateFormWithSpecs(aiSearchResult.bestEffort);
-      } else if (action === 'best_effort') {
-          toast({ title: "Using AI Estimation", description: "Populating specs with AI's best-effort data." });
-          populateFormWithSpecs(aiSearchResult.bestEffort);
-      }
-      setAiSearchResult(null);
-  };
+    setDialogState({ type: 'idle' });
+    startTransition(async () => {
+        toast({ title: 'AI "Bloodhound" Mode Activated', description: "Scouring the internet for parameters...", duration: 5000 });
+        const result = await getBestEffortSpecsAction(componentName);
+
+        if (result.error || !result.data) {
+            toast({ variant: 'destructive', title: 'Best Effort Search Failed', description: result.error || "Could not find any parameters." });
+        } else {
+            setDialogState({ type: 'best_effort_found', data: result.data });
+        }
+    });
+  }, [form, toast]);
 
 
   const runSimulation = async (values: FormValues, updateCallback: (data: LiveDataPoint[]) => void): Promise<SimulationResult> => {
@@ -557,6 +556,87 @@ export default function AmpereAnalyzer() {
 }, [simulationResult, aiOptimizationSuggestions, form, toast, runDeepDiveSimulation, history]);
 
 
+  const renderDialogs = () => {
+    switch (dialogState.type) {
+        case 'datasheet_found':
+            const { data } = dialogState;
+            const { keyParameters } = data;
+            return (
+                <AlertDialog open={true} onOpenChange={() => setDialogState({ type: 'idle' })}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2"><Search /> AI Datasheet Found</AlertDialogTitle>
+                            <AlertDialogDescription>The AI found a likely datasheet for your component. How should we proceed?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="p-4 my-4 bg-muted/50 rounded-lg text-center">
+                            <FileText className="h-8 w-8 mx-auto text-primary mb-2" />
+                            <p className="font-semibold">{data.foundDatasheetName}</p>
+                            <p className="text-sm text-muted-foreground mt-2">
+                                Max Current: <span className="font-medium text-foreground">{keyParameters.maxCurrent}A</span>, 
+                                Max Voltage: <span className="font-medium text-foreground">{keyParameters.maxVoltage}V</span>, 
+                                Rds(on)/Vce(sat): <span className="font-medium text-foreground">{keyParameters.rdsOn || keyParameters.vceSat}</span>
+                            </p>
+                        </div>
+                        <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                                // For now, parsing the "found" PDF is a simulation. 
+                                // We'll trigger the best effort search to get full specs as if they were parsed.
+                                handleBestEffortSearch();
+                                toast({ title: "Parsing Datasheet...", description: "AI is extracting full parameters." });
+                            }}>Yes, Parse Full Specs</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            );
+        case 'no_datasheet_found':
+            return (
+                <AlertDialog open={true} onOpenChange={() => setDialogState({ type: 'idle' })}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2"><Bot /> No Datasheet Found</AlertDialogTitle>
+                            <AlertDialogDescription>The AI couldn't find a specific datasheet PDF. Would you like to activate "Bloodhound Mode" to scour the web for individual parameters?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBestEffortSearch}>Find Best Effort Parameters</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            );
+        case 'best_effort_found':
+            const { data: specs } = dialogState;
+            return (
+                <AlertDialog open={true} onOpenChange={() => setDialogState({ type: 'idle' })}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2"><Bot /> AI Best Effort Results</AlertDialogTitle>
+                            <AlertDialogDescription>The AI has compiled the following parameters. Confidence: <span className='font-bold'>{specs.confidence}</span>.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="p-3 my-2 bg-muted/50 rounded-lg text-xs space-y-1">
+                            <p><strong>Sources:</strong> <em className="text-muted-foreground">{specs.sources}</em></p>
+                             <p>
+                                Max Current: <span className="font-medium text-foreground">{specs.maxCurrent}A</span>,
+                                Max Voltage: <span className="font-medium text-foreground">{specs.maxVoltage}V</span>,
+                                Rds(on): <span className="font-medium text-foreground">{specs.rdsOn}m&#8486;</span>
+                            </p>
+                        </div>
+                        <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             <AlertDialogCancel>Discard</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                                populateFormWithSpecs(specs);
+                                setDialogState({ type: 'idle' });
+                            }}>Use These Parameters</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            );
+        default:
+            return null;
+    }
+  }
+
+
   return (
     <div className="space-y-8">
       <header className="text-center">
@@ -603,35 +683,7 @@ export default function AmpereAnalyzer() {
         </TabsContent>
       </Tabs>
       
-       <AlertDialog open={isDialogVisible} onOpenChange={setIsDialogVisible}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2"><Search /> AI Search Result</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        The AI has found a potential datasheet for your component.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="p-4 my-4 bg-muted/50 rounded-lg text-center">
-                    <FileText className="h-8 w-8 mx-auto text-primary mb-2" />
-                    <p className="font-semibold">{aiSearchResult?.foundDatasheetName}</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        Key parameters found by the AI: <br />
-                        Max Current: <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.maxCurrent}A</span>, 
-                        Max Voltage: <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.maxVoltage}V</span>, 
-                        Rds(on): <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.rdsOn}m&#8486;</span>
-                    </p>
-                </div>
-                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <AlertDialogCancel onClick={() => setAiSearchResult(null)}>No, I'll enter manually</AlertDialogCancel>
-                    <AlertDialogAction className="bg-secondary hover:bg-secondary/80" onClick={() => handleDialogAction('best_effort')}>Use AI Best Effort</AlertDialogAction>
-                    <AlertDialogAction onClick={() => handleDialogAction('parse')}>Yes, Parse</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+      {renderDialogs()}
     </div>
   );
 }
-
-    
-
-    

@@ -7,6 +7,7 @@ import { getAiOptimizationSuggestions } from "@/ai/flows/ai-optimization-advisor
 import { findDatasheet } from "@/ai/flows/ai-datasheet-finder";
 import { runAiDeepDiveAnalysis } from "@/ai/flows/ai-deep-dive-analysis";
 import type { AiDeepDiveAnalysisInput } from "@/lib/types";
+import { getBestEffortSpecs } from "@/ai/flows/ai-best-effort-search";
 
 const datasheetSchema = z.object({
   componentName: z.string().min(1, "Component name is required."),
@@ -26,12 +27,26 @@ export async function findDatasheetAction(formData: FormData) {
     const { componentName } = validated.data;
 
     const searchResult = await findDatasheet({ componentName });
+    // If datasheet is not found, it will return null, which is expected.
     return { data: searchResult };
 
   } catch (e) {
     console.error(e);
     return { error: "Failed to find datasheet." };
   }
+}
+
+export async function getBestEffortSpecsAction(componentName: string) {
+    if (!componentName) {
+        return { error: "Component name is required." };
+    }
+    try {
+        const result = await getBestEffortSpecs({ componentName });
+        return { data: result };
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to get best-effort specs." };
+    }
 }
 
 export async function extractSpecsFromDatasheetAction(formData: FormData) {
