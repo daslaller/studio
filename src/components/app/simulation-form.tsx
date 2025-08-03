@@ -301,19 +301,19 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                <FormControl>
                                    <RadioGroupItem value="ftf" id="ftf" />
                                </FormControl>
-                               <FormLabel htmlFor="ftf" className="font-normal text-sm">First-To-Fail</FormLabel>
+                               <FormLabel htmlFor="ftf" className="font-normal text-xs sm:text-sm">First-To-Fail</FormLabel>
                            </FormItem>
                            <FormItem className="flex items-center space-x-2">
                                <FormControl>
                                    <RadioGroupItem value="temp" id="temp" />
                                </FormControl>
-                               <FormLabel htmlFor="temp" className="font-normal text-sm">Temperature Limit</FormLabel>
+                               <FormLabel htmlFor="temp" className="font-normal text-xs sm:text-sm">Temperature Limit</FormLabel>
                            </FormItem>
                            <FormItem className="flex items-center space-x-2">
                                <FormControl>
                                    <RadioGroupItem value="budget" id="budget" />
                                </FormControl>
-                               <FormLabel htmlFor="budget" className="font-normal text-sm">Cooling Budget</FormLabel>
+                               <FormLabel htmlFor="budget" className="font-normal text-xs sm:text-sm">Cooling Budget</FormLabel>
                            </FormItem>
                         </RadioGroup>
                     )}
