@@ -33,6 +33,10 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.75rem;
+
+    --gradient-color-1: #000428;
+    --gradient-color-2: #004e92;
+    --gradient-color-3: #1c2331;
   }
   .dark {
     --background: 224 71% 4%;
@@ -61,6 +65,25 @@ body {
     --chart-5: 27 87% 67%;
   }
 }
+
+@keyframes animated-gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+.animated-background {
+  background: linear-gradient(-45deg, var(--gradient-color-1), var(--gradient-color-2), var(--gradient-color-3));
+  background-size: 400% 400%;
+  animation: animated-gradient 30s ease infinite;
+}
+
 
 @layer base {
   * {
