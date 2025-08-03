@@ -422,7 +422,7 @@ export default function AmpereAnalyzer() {
             maxTemperature: values.maxTemperature,
             coolingBudget: coolingBudgetVal,
             simulationResults: simulationSummary,
-            allCoolingMethods: JSON.stringify(coolingMethods.map(c => ({name: c.name, value: c.value}))),
+            allCoolingMethods: JSON.stringify(coolingMethods.map(c => ({name: c.name, value: c.value, thermalResistance: c.thermalResistance, coolingBudget: c.coolingBudget}))),
             initialSpecs: JSON.stringify(initialSpecs),
         };
 
@@ -436,23 +436,25 @@ export default function AmpereAnalyzer() {
             return;
         } 
         
+        const bestCoolerInfo = coolingMethods.find(c => c.value === result.data.bestCoolingMethod);
+
         // Prepare simulation steps
         const simulationSteps: AiDeepDiveStep[] = [
             {
-                title: "Analyzing Initial Failure",
-                description: "The AI is examining the original simulation data to identify the primary bottleneck.",
+                title: "Analyzing Initial Results",
+                description: `AI is reviewing the initial simulation where the failure occurred at ${simulationResult.maxSafeCurrent.toFixed(2)}A due to ${simulationResult.failureReason}. The goal is to push past this limit.`,
                 simulationResult: simulationResult,
                 simulationParams: {},
             },
             {
-                title: "Testing Optimal Frequency",
-                description: `The AI is re-running the simulation with a suggested optimal frequency of ${result.data.optimalFrequency} kHz to reduce switching losses.`,
+                title: "Optimizing Frequency",
+                description: `AI has identified that reducing switching losses is key. It's now testing a new frequency of ${result.data.optimalFrequency} kHz.`,
                 simulationResult: null,
                 simulationParams: { switchingFrequency: result.data.optimalFrequency },
             },
             {
-                title: "Testing Upgraded Cooler",
-                description: `The AI is now applying the '${result.data.bestCoolingMethod}' and re-evaluating performance with the new thermal solution.`,
+                title: "Applying Upgraded Cooler",
+                description: `To handle the remaining heat, the AI is applying the '${bestCoolerInfo?.name || result.data.bestCoolingMethod}' and re-evaluating performance with the new thermal solution.`,
                 simulationResult: null,
                 simulationParams: { coolingMethod: result.data.bestCoolingMethod, switchingFrequency: result.data.optimalFrequency },
             },
@@ -472,23 +474,30 @@ export default function AmpereAnalyzer() {
             const step = simulationSteps[i];
 
             if(step.simulationResult === null && Object.keys(step.simulationParams).length > 0) {
+                // To show a clean slate for the new simulation, clear liveData before running
+                setLiveData([]);
+                await new Promise(r => setTimeout(r, 100)); // small delay to clear chart
+
                 const stepSimResult = await runDeepDiveSimulation(values, step.simulationParams, setLiveData);
                 simulationSteps[i].simulationResult = stepSimResult;
                 setDeepDiveSteps([...simulationSteps]);
                 await new Promise(r => setTimeout(r, 1000)); // Pause to let user see results
             } else if (step.simulationResult) {
+                 // Re-run simulation for the initial state to show the graph
+                 setLiveData([]);
+                 await new Promise(r => setTimeout(r, 100));
                  await runDeepDiveSimulation(values, {}, setLiveData);
                  await new Promise(r => setTimeout(r, 1000));
             }
 
             if(i < simulationSteps.length -1) {
-              await new Promise(r => setTimeout(r, 2000)); // wait before going to next step
+              await new Promise(r => setTimeout(r, 2500)); // wait before going to next step
             }
         }
         
         toast({
             title: "AI Deep Dive Complete",
-            description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A.`,
+            description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent.toFixed(2)}A.`,
             duration: 9000,
         });
         
@@ -504,9 +513,8 @@ export default function AmpereAnalyzer() {
             addToHistory(historyEntry);
         }
 
-        form.setValue('coolingMethod', result.data.bestCoolingMethod);
-        form.setValue('switchingFrequency', result.data.optimalFrequency);
-        setIsDeepDiveRunning(false);
+        // Keep the dive view open, but mark it as 'done'
+        setIsDeepDiveRunning(true); 
     });
 
 }, [simulationResult, aiOptimizationSuggestions, form, toast, runDeepDiveSimulation, history]);
@@ -561,4 +569,3 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-

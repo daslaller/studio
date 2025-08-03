@@ -36,16 +36,16 @@ export const AiDeepDiveAnalysisInputSchema = z.object({
   maxTemperature: z.number().describe('The maximum allowed temperature in degrees Celsius.'),
   coolingBudget: z.number().describe('The cooling budget available in Watts.'),
   simulationResults: z.string().describe('The results of the initial simulation.'),
-  allCoolingMethods: z.string().describe('A JSON string of all available cooling methods and their specs.'),
+  allCoolingMethods: z.string().describe('A JSON string of all available cooling methods and their specs (name, value, thermalResistance, coolingBudget).'),
   initialSpecs: z.string().describe('A JSON string of the initial transistor specifications.'),
 });
 export type AiDeepDiveAnalysisInput = z.infer<typeof AiDeepDiveAnalysisInputSchema>;
 
 
 export const AiDeepDiveAnalysisOutputSchema = z.object({
-    bestCoolingMethod: z.string().describe("The value for the optimal cooling method found."),
+    bestCoolingMethod: z.string().describe("The 'value' for the optimal cooling method found (e.g., 'air-nh-d15')."),
     optimalFrequency: z.number().describe("The suggested optimal switching frequency in kHz."),
-    reasoning: z.string().describe("Detailed reasoning for why these new parameters are optimal."),
+    reasoning: z.string().describe("Detailed reasoning for why these new parameters are optimal, explaining the step-by-step thought process."),
     projectedMaxSafeCurrent: z.number().describe("The new projected max safe current in Amps with these changes."),
 });
 export type AiDeepDiveAnalysisOutput = z.infer<typeof AiDeepDiveAnalysisOutputSchema>;

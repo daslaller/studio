@@ -29,16 +29,16 @@ const prompt = ai.definePrompt({
     - Initial Simulation Results: {{{simulationResults}}}
     - Component Name: {{{componentName}}}
     - Initial Specs: {{{initialSpecs}}}
-    - Available Cooling Methods (JSON): {{{allCoolingMethods}}}
+    - Available Cooling Methods (JSON with thermal resistance and budget): {{{allCoolingMethods}}}
 
     **Your Thought Process (Simulated):**
-    1.  **Analyze the Failure:** First, understand why the initial simulation failed or where the bottleneck is. Was it thermal throttling? Power dissipation? Cooling budget?
-    2.  **Iterate on Cooling:** Examine the list of available coolers. If the failure was thermal, select a more powerful cooler. If the simulation was successful but you think you can push it further, select a better cooler. Consider the trade-off between thermal resistance and cooling budget.
-    3.  **Iterate on Frequency:** Lowering the switching frequency reduces switching losses, which generates less heat. This might allow for a higher current. Find the sweet spot.
-    4.  **Synthesize and Recommend:** Based on your iterative analysis, determine the *single best* combination of a cooling solution and switching frequency.
+    1.  **Analyze the Failure:** First, understand why the initial simulation failed or where the bottleneck is. The failure reason is in 'simulationResults'. Was it thermal throttling? Power dissipation? Cooling budget?
+    2.  **Iterate on Frequency:** Determine if lowering the switching frequency would be beneficial. Lower frequency reduces switching losses, which lowers heat. This might allow for a higher current. Find a sweet spot.
+    3.  **Iterate on Cooling:** Examine the list of available coolers. If the failure was thermal or if you need more headroom, select a more powerful cooler (one with lower thermal resistance and higher budget). Consider the trade-off between thermal performance and cost/size (implied by budget).
+    4.  **Synthesize and Recommend:** Based on your iterative analysis, determine the *single best* combination of a cooling solution (by its 'value' property) and switching frequency.
 
     **Output:**
-    Provide your final recommendation in the specified JSON format. Your reasoning should be clear and explain the trade-offs you considered.
+    Provide your final recommendation in the specified JSON format. Your 'reasoning' should be clear, concise, and explain the trade-offs you considered and why you chose the final parameters. For example: "The initial simulation failed due to thermal limits. By reducing the frequency to 80kHz, we lowered switching losses. This alone wasn't enough, so upgrading to the 'air-dark-rock-pro-4' cooler provided the necessary headroom to reach a new projected max current of 55A."
     `,
 });
 
