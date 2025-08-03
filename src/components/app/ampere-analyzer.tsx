@@ -569,3 +569,5 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
