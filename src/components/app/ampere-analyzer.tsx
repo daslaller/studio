@@ -8,9 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
 import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction } from '@/app/actions';
-import type { SimulationResult, ExtractTransistorSpecsOutput, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint } from '@/lib/types';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
-import { AiDeepDiveAnalysisInput } from '@/ai/flows/ai-deep-dive-analysis';
 
 const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
@@ -359,13 +358,11 @@ export default function AmpereAnalyzer() {
         if (result.error) {
             toast({ variant: 'destructive', title: 'AI Deep Dive Error', description: result.error });
         } else if (result.data) {
-            // For now, just show a toast. This will be replaced with a live view.
             toast({
                 title: "AI Deep Dive Complete",
                 description: `Optimal solution found! Projected Current: ${result.data.projectedMaxSafeCurrent}A. ${result.data.reasoning}`,
                 duration: 9000,
             });
-            // Here you could update the form with the new values and re-run the simulation
             form.setValue('coolingMethod', result.data.bestCoolingMethod);
             form.setValue('switchingFrequency', result.data.optimalFrequency);
         }
