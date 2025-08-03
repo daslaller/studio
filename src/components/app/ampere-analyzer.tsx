@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -106,7 +106,7 @@ export default function AmpereAnalyzer() {
     }
   };
   
-  const handleDatasheetLookup = async () => {
+  const handleDatasheetLookup = useCallback(async () => {
     const componentName = form.getValues('componentName');
     const datasheet = datasheetFile;
 
@@ -122,6 +122,7 @@ export default function AmpereAnalyzer() {
         formData.append('datasheet', datasheet);
       }
 
+      toast({ title: 'AI Datasheet Search', description: 'The AI is looking for your component...' });
       const result = await findOrExtractTransistorSpecsAction(formData);
 
       if (result.error) {
@@ -154,7 +155,7 @@ export default function AmpereAnalyzer() {
         toast({ title: toastTitle, description: toastDescription });
       }
     });
-  };
+  }, [form, datasheetFile, toast]);
 
   const runSimulation = async (values: FormValues, updateCallback: (data: LiveDataPoint[]) => void): Promise<SimulationResult> => {
       const {
@@ -217,22 +218,24 @@ export default function AmpereAnalyzer() {
               return { status: 'failure', maxSafeCurrent, failureReason, details, finalTemperature: ambientTemperature + lastSafeTempRise, powerDissipation: { total: lastSafeTotalLoss, conduction: lastSafeConductionLoss, switching: lastSafeSwitchingLoss } };
           }
           
-          switch (failureReason || simulationMode) {
-              case 'Thermal':
+          switch (simulationMode) {
               case 'temp':
                   progress = (finalTemperature / maxTemperature) * 100;
                   limitValue = maxTemperature;
                   break;
-              case 'Cooling Budget':
               case 'budget':
                   progress = (totalLoss / effectiveCoolingBudget) * 100;
                   limitValue = effectiveCoolingBudget;
                   break;
-              case 'Power Dissipation':
-                  progress = (totalLoss / powerDissipation) * 100;
-                  limitValue = powerDissipation;
+              case 'ftf':
+                  const tempProgress = (finalTemperature / maxTemperature) * 100;
+                  const powerProgress = (totalLoss / powerDissipation) * 100;
+                  const budgetProgress = (totalLoss / effectiveCoolingBudget) * 100;
+                  const currentProgress = (current / maxCurrent) * 100;
+                  progress = Math.max(tempProgress, powerProgress, budgetProgress, currentProgress);
+                  limitValue = 100; // In FTF, the limit is reaching 100% of any of the individual limits
                   break;
-              default: // Current or FTF default
+              default: 
                   progress = (current / maxCurrent) * 100;
                   limitValue = maxCurrent;
           }

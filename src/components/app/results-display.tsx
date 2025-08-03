@@ -37,13 +37,25 @@ export default function ResultsDisplay({
   formValues
 }: ResultsDisplayProps) {
 
-  if (isLoading && !simulationResult) {
+  if (isLoading && liveData.length > 0) {
     return (
       <LiveSimulationView 
         liveData={liveData} 
         simulationMode={formValues.simulationMode}
         maxTemperature={formValues.maxTemperature}
       />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="flex flex-col items-center justify-center h-full p-8 text-center border-dashed border-white/20 bg-transparent shadow-none">
+          <Bot className="h-16 w-16 text-muted-foreground/50 mb-4 animate-pulse" />
+          <CardTitle className="text-xl">Preparing Analysis...</CardTitle>
+          <CardDescription className="mt-2 max-w-xs mx-auto">
+            The AI is getting ready to run the simulation. Please wait.
+          </CardDescription>
+      </Card>
     );
   }
 
@@ -85,7 +97,7 @@ export default function ResultsDisplay({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <ResultMetric icon={Gauge} label="Max Safe Current" value={simulationResult.maxSafeCurrent.toFixed(2)} unit="A" colorClass="text-green-400" />
             <ResultMetric icon={Thermometer} label="Final Junction Temp" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" colorClass="text-orange-400" />
-            <ResultMetric icon={Power} label="Total Power Loss" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" colorClass="text-red-400"/>
+            <ResultMetric icon={Power} label="Total Heat Generation" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" colorClass="text-red-400"/>
             <ResultMetric icon={Cpu} label="Conduction Loss" value={simulationResult.powerDissipation.conduction.toFixed(2)} unit="W" />
             <ResultMetric icon={TrendingUp} label="Switching Loss" value={simulationResult.powerDissipation.switching.toFixed(2)} unit="W" />
           </div>
