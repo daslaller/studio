@@ -34,6 +34,26 @@ const endConditionDescriptions: Record<string, string> = {
     budget: "Isolates for cooler performance. Stops only when power loss exceeds the cooling budget.",
 };
 
+const textAnimation = {
+  hidden: { opacity: 0 },
+  visible: (i = 1) => ({
+    opacity: 1,
+    transition: { staggerChildren: 0.01, delayChildren: i * 0.01 },
+  }),
+};
+
+const charAnimation = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+    },
+  },
+};
+
+
 export default function SimulationForm({ form, onSubmit, isPending, onTransistorSelect, onDatasheetLookup, setDatasheetFile }: SimulationFormProps) {
     const selectedCoolingMethod = coolingMethods.find(m => m.value === form.watch('coolingMethod'));
     const currentTransistorType = form.watch('transistorType');
@@ -301,35 +321,46 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                <FormControl>
                                    <RadioGroupItem value="ftf" id="ftf" />
                                </FormControl>
-                               <FormLabel htmlFor="ftf" className="font-normal text-xs sm:text-sm">First-To-Fail</FormLabel>
+                               <FormLabel htmlFor="ftf" className="font-normal text-xs">First-To-Fail</FormLabel>
                            </FormItem>
                            <FormItem className="flex items-center space-x-2">
                                <FormControl>
                                    <RadioGroupItem value="temp" id="temp" />
                                </FormControl>
-                               <FormLabel htmlFor="temp" className="font-normal text-xs sm:text-sm">Temperature Limit</FormLabel>
+                               <FormLabel htmlFor="temp" className="font-normal text-xs">Temp Limit</FormLabel>
                            </FormItem>
                            <FormItem className="flex items-center space-x-2">
                                <FormControl>
                                    <RadioGroupItem value="budget" id="budget" />
                                </FormControl>
-                               <FormLabel htmlFor="budget" className="font-normal text-xs sm:text-sm">Cooling Budget</FormLabel>
+                               <FormLabel htmlFor="budget" className="font-normal text-xs">Cooling Budget</FormLabel>
                            </FormItem>
                         </RadioGroup>
                     )}
                 />
                  
                 <div className="relative min-h-[60px]">
-                    <AnimatePresence initial={false}>
+                    <AnimatePresence mode="wait">
                         <motion.div
                             key={simulationMode}
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className="p-3 bg-white/5 rounded-md border border-white/10"
                         >
-                            <p className='text-sm text-muted-foreground'>{endConditionDescriptions[simulationMode]}</p>
+                            <motion.p
+                                className='text-sm text-muted-foreground'
+                                key={simulationMode + "_desc"}
+                                initial="hidden"
+                                animate="visible"
+                                variants={textAnimation}
+                                aria-live="polite"
+                            >
+                                {endConditionDescriptions[simulationMode].split("").map((char, i) => (
+                                    <motion.span key={i} variants={charAnimation}>{char}</motion.span>
+                                ))}
+                            </motion.p>
                         </motion.div>
                     </AnimatePresence>
                 </div>
@@ -371,4 +402,3 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
-
