@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power } from 'lucide-react';
+import React from "react";
 
 interface ResultsDisplayProps {
   isLoading: boolean;
@@ -13,10 +14,10 @@ interface ResultsDisplayProps {
   aiOptimizationSuggestions: AiOptimizationSuggestionsOutput | null;
 }
 
-const ResultMetric = ({ icon, label, value, unit }: { icon: React.ElementType, label: string, value: string | number, unit: string }) => (
+const ResultMetric = ({ icon, label, value, unit, colorClass = 'text-primary' }: { icon: React.ElementType, label: string, value: string | number, unit: string, colorClass?: string }) => (
     <div className="flex items-start space-x-3 rounded-lg p-4 bg-white/5 transition-all hover:bg-white/10">
         <div className="flex-shrink-0 mt-1">
-            {React.createElement(icon, { className: "h-6 w-6 text-primary" })}
+            {React.createElement(icon, { className: `h-6 w-6 ${colorClass}` })}
         </div>
         <div>
             <p className="text-sm text-muted-foreground">{label}</p>
@@ -60,6 +61,14 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
 
   const isSuccess = simulationResult.status === 'success';
 
+  const failureIcons = {
+    Thermal: Thermometer,
+    Current: Gauge,
+    Voltage: Zap,
+    'Power Loss': Power,
+  };
+  const FailureIcon = simulationResult.failureReason ? failureIcons[simulationResult.failureReason] || AlertTriangle : AlertTriangle;
+
   return (
     <div className="space-y-6 animate-in fade-in-0 duration-500">
       <Card>
@@ -68,14 +77,14 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert variant={isSuccess ? 'default' : 'destructive'} className={isSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}>
-            {isSuccess ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            {isSuccess ? <CheckCircle2 className="h-4 w-4" /> : <FailureIcon className="h-4 w-4" />}
             <AlertTitle className="font-bold">{isSuccess ? 'Analysis Successful' : `Failure: ${simulationResult.failureReason} Limit Reached`}</AlertTitle>
             <AlertDescription>{simulationResult.details}</AlertDescription>
           </Alert>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <ResultMetric icon={Gauge} label="Max Safe Current" value={simulationResult.maxSafeCurrent.toFixed(2)} unit="A" />
-            <ResultMetric icon={Thermometer} label="Final Junction Temp" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" />
-            <ResultMetric icon={Zap} label="Total Power Loss" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" />
+            <ResultMetric icon={Gauge} label="Max Safe Current" value={simulationResult.maxSafeCurrent.toFixed(2)} unit="A" colorClass="text-green-400" />
+            <ResultMetric icon={Thermometer} label="Final Junction Temp" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" colorClass="text-orange-400" />
+            <ResultMetric icon={Power} label="Total Power Loss" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" colorClass="text-red-400"/>
             <ResultMetric icon={Cpu} label="Conduction Loss" value={simulationResult.powerDissipation.conduction.toFixed(2)} unit="W" />
             <ResultMetric icon={TrendingUp} label="Switching Loss" value={simulationResult.powerDissipation.switching.toFixed(2)} unit="W" />
           </div>
