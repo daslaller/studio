@@ -292,7 +292,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                     render={({ field }) => (
                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                            <TooltipProvider>
-                               <FormItem className="flex-1">
+                                <FormItem>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <FormControl>
@@ -301,18 +301,14 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                         </TooltipTrigger>
                                         <TooltipContent><p>Default and most realistic mode.</p></TooltipContent>
                                     </Tooltip>
-                                    <FormLabel htmlFor="ftf" className="flex flex-col items-center justify-between text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary min-h-[8rem] transition-all">
+                                    <FormLabel htmlFor="ftf" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
                                         First-To-Fail
-                                        <AnimatePresence>
-                                        {simulationMode === 'ftf' && (
-                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                                                <FormDescription className="text-xs mt-2">Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.</FormDescription>
-                                            </motion.div>
-                                        )}
-                                        </AnimatePresence>
+                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
+                                            Stops when any limit (Temp, Current, Cooling Budget, etc.) is hit.
+                                        </FormDescription>
                                     </FormLabel>
                                 </FormItem>
-                                <FormItem className="flex-1">
+                                <FormItem>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <FormControl>
@@ -321,18 +317,14 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                         </TooltipTrigger>
                                         <TooltipContent><p>Isolate for thermal performance only.</p></TooltipContent>
                                     </Tooltip>
-                                    <FormLabel htmlFor="temp" className="flex flex-col items-center justify-between text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary min-h-[8rem] transition-all">
+                                    <FormLabel htmlFor="temp" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
                                         Temperature Limit
-                                         <AnimatePresence>
-                                        {simulationMode === 'temp' && (
-                                             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                                                <FormDescription className="text-xs mt-2">Stops only when the Max Junction Temp is exceeded.</FormDescription>
-                                            </motion.div>
-                                        )}
-                                        </AnimatePresence>
+                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
+                                            Stops only when the Max Junction Temp is exceeded.
+                                        </FormDescription>
                                     </FormLabel>
                                 </FormItem>
-                               <FormItem className="flex-1">
+                               <FormItem>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <FormControl>
@@ -341,15 +333,11 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                         </TooltipTrigger>
                                         <TooltipContent><p>Isolate for cooler performance.</p></TooltipContent>
                                     </Tooltip>
-                                    <FormLabel htmlFor="budget" className="flex flex-col items-center justify-between text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary min-h-[8rem] transition-all">
+                                    <FormLabel htmlFor="budget" className="flex flex-col items-center justify-center text-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-all">
                                         Cooling Budget
-                                        <AnimatePresence>
-                                        {simulationMode === 'budget' && (
-                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                                                <FormDescription className="text-xs mt-2">Stops only when power loss exceeds the cooling budget.</FormDescription>
-                                            </motion.div>
-                                        )}
-                                        </AnimatePresence>
+                                        <FormDescription className="text-xs mt-2 md:hidden md:peer-data-[state=unchecked]:invisible">
+                                            Stops only when power loss exceeds the cooling budget.
+                                        </FormDescription>
                                     </FormLabel>
                                 </FormItem>
                            </TooltipProvider>
@@ -386,5 +374,3 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
-
-    
