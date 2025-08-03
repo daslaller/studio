@@ -15,7 +15,11 @@ export interface ManualSpecs {
   maxTemperature: string;
 }
 
-export interface ExtractTransistorSpecsOutput extends ManualSpecs {
+export interface ExtractTransistorSpecsOutput extends ManualSpecs {}
+
+export interface FindDatasheetOutput {
+    foundDatasheetName?: string;
+    bestEffort: ManualSpecs;
 }
 
 export interface AiCalculatedExpectedResultsOutput {

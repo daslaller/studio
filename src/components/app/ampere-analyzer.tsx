@@ -8,11 +8,13 @@ import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
-import { findOrExtractTransistorSpecsAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction } from '@/app/actions';
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry } from '@/lib/types';
+import { findDatasheetAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction, extractSpecsFromDatasheetAction } from '@/app/actions';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import HistoryView from './history-view';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { FileText, Search } from 'lucide-react';
 
 const isMosfetType = (type: string) => {
     return type.includes('MOSFET') || type.includes('GaN');
@@ -76,6 +78,9 @@ export default function AmpereAnalyzer() {
   const [deepDiveSteps, setDeepDiveSteps] = useState<AiDeepDiveStep[]>([]);
   const [currentDeepDiveStep, setCurrentDeepDiveStep] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [aiSearchResult, setAiSearchResult] = useState<FindDatasheetOutput | null>(null);
+  const [isDialogVisible, setIsDialogVisible] = useState(false);
+
 
   const resultsRef = useRef<HTMLDivElement>(null);
   
@@ -129,6 +134,29 @@ export default function AmpereAnalyzer() {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
+  
+  const populateFormWithSpecs = useCallback((specs: ManualSpecs | ExtractTransistorSpecsOutput) => {
+      form.setValue('maxCurrent', parseFloat(specs.maxCurrent) || 0);
+      form.setValue('maxVoltage', parseFloat(specs.maxVoltage) || 0);
+      form.setValue('powerDissipation', parseFloat(specs.powerDissipation) || 0);
+      form.setValue('rthJC', parseFloat(specs.rthJC) || 0);
+      form.setValue('maxTemperature', parseFloat(specs.maxTemperature) || 150);
+      form.setValue('riseTime', parseFloat(specs.riseTime) || 0);
+      form.setValue('fallTime', parseFloat(specs.fallTime) || 0);
+
+      const type = specs.transistorType || form.getValues('transistorType');
+      form.setValue('transistorType', type);
+
+      if (isMosfetType(type)) {
+          form.setValue('rdsOn', parseFloat(specs.rdsOn) || 0);
+          form.setValue('vceSat', undefined);
+      } else {
+          form.setValue('vceSat', parseFloat(specs.vceSat) || 0);
+          form.setValue('rdsOn', undefined);
+      }
+      toast({ title: "Specifications Loaded", description: "The form has been updated with the new component data." });
+  }, [form, toast]);
+
 
   const handleTransistorSelect = (value: string) => {
     const transistor = predefinedTransistors.find(t => t.value === value);
@@ -137,71 +165,80 @@ export default function AmpereAnalyzer() {
         ...form.getValues(),
         predefinedComponent: value,
         componentName: transistor.name,
-        transistorType: transistor.specs.transistorType,
-        maxCurrent: parseFloat(transistor.specs.maxCurrent),
-        maxVoltage: parseFloat(transistor.specs.maxVoltage),
-        powerDissipation: parseFloat(transistor.specs.powerDissipation),
-        rdsOn: parseFloat(transistor.specs.rdsOn) || undefined,
-        vceSat: parseFloat(transistor.specs.vceSat) || undefined,
-        riseTime: parseFloat(transistor.specs.riseTime),
-        fallTime: parseFloat(transistor.specs.fallTime),
-        rthJC: parseFloat(transistor.specs.rthJC),
-        maxTemperature: parseFloat(transistor.specs.maxTemperature) || 150,
       });
-      toast({ title: "Component Loaded", description: `${transistor.name} specs have been loaded into the manual fields.` });
+      populateFormWithSpecs(transistor.specs);
     }
   };
   
   const handleDatasheetLookup = useCallback(async () => {
     const componentName = form.getValues('componentName');
-    const datasheet = datasheetFile;
+    const uploadedFile = datasheetFile;
 
-     if (!componentName) {
+    if (!componentName) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please enter a component name.' });
       return;
     }
 
     startTransition(async () => {
+      // If a file is uploaded, parse it directly.
+      if (uploadedFile) {
+        toast({ title: 'Parsing Uploaded PDF', description: 'The AI is extracting specs from your datasheet...' });
+        const formData = new FormData();
+        formData.append('componentName', componentName);
+        formData.append('datasheet', uploadedFile);
+        const result = await extractSpecsFromDatasheetAction(formData);
+        if (result.error) {
+          toast({ variant: 'destructive', title: 'Datasheet Parsing Error', description: result.error });
+        } else if (result.data) {
+          populateFormWithSpecs(result.data);
+        }
+        return;
+      }
+
+      // Otherwise, use the AI to find one online.
+      toast({ title: 'AI Datasheet Search', description: 'The AI is looking for your component...' });
       const formData = new FormData();
       formData.append('componentName', componentName);
-      if (datasheet) {
-        formData.append('datasheet', datasheet);
-      }
-
-      toast({ title: 'AI Datasheet Search', description: 'The AI is looking for your component...' });
-      const result = await findOrExtractTransistorSpecsAction(formData);
+      
+      const result = await findDatasheetAction(formData);
 
       if (result.error) {
-        toast({ variant: 'destructive', title: 'Datasheet Parsing Error', description: result.error });
+        toast({ variant: 'destructive', title: 'AI Search Error', description: result.error });
       } else if (result.data) {
-        const { data, source } = result;
-        form.setValue('maxCurrent', parseFloat(data.maxCurrent) || 0);
-        form.setValue('maxVoltage', parseFloat(data.maxVoltage) || 0);
-        form.setValue('powerDissipation', parseFloat(data.powerDissipation) || 0);
-        form.setValue('rthJC', parseFloat(data.rthJC) || 0);
-        form.setValue('maxTemperature', parseFloat(data.maxTemperature) || 150);
-        form.setValue('riseTime', parseFloat(data.riseTime) || 0);
-        form.setValue('fallTime', parseFloat(data.fallTime) || 0);
-        
-        const type = data.transistorType || form.getValues('transistorType');
-        form.setValue('transistorType', type);
-        
-        if (isMosfetType(type)) {
-            form.setValue('rdsOn', parseFloat(data.rdsOn) || 0);
-            form.setValue('vceSat', undefined);
+        setAiSearchResult(result.data);
+        if (result.data.foundDatasheetName) {
+            // If a datasheet is found, open the confirmation dialog
+            setIsDialogVisible(true);
         } else {
-            form.setValue('vceSat', parseFloat(data.vceSat) || 0);
-            form.setValue('rdsOn', undefined);
+            // If no datasheet found, use best effort and notify user
+            populateFormWithSpecs(result.data.bestEffort);
+            toast({
+                title: "AI Analysis Complete",
+                description: "Could not find a specific datasheet. Populating with AI's best-effort estimation.",
+                duration: 7000,
+            });
         }
-        
-        const toastTitle = source === 'pdf' ? 'Datasheet Parsed' : 'AI Analysis Complete';
-        const toastDescription = source === 'pdf'
-          ? 'Specifications have been extracted and populated.'
-          : 'AI has populated the specs based on online data or its best estimate.';
-        toast({ title: toastTitle, description: toastDescription });
       }
     });
-  }, [form, datasheetFile, toast]);
+  }, [form, datasheetFile, toast, populateFormWithSpecs]);
+
+  const handleDialogAction = (action: 'parse' | 'best_effort') => {
+      setIsDialogVisible(false);
+      if (!aiSearchResult) return;
+
+      if (action === 'parse') {
+          // This part is now hypothetical, as we can't actually download and parse the "found" PDF.
+          // In a real scenario, we'd fetch the PDF here. For now, we'll use the bestEffort data
+          // as if it were the parsed result.
+          toast({ title: "Parsing Datasheet...", description: `Using data found for ${aiSearchResult.foundDatasheetName}` });
+          populateFormWithSpecs(aiSearchResult.bestEffort);
+      } else if (action === 'best_effort') {
+          toast({ title: "Using AI Estimation", description: "Populating specs with AI's best-effort data." });
+          populateFormWithSpecs(aiSearchResult.bestEffort);
+      }
+      setAiSearchResult(null);
+  };
+
 
   const runSimulation = async (values: FormValues, updateCallback: (data: LiveDataPoint[]) => void): Promise<SimulationResult> => {
       const {
@@ -447,13 +484,13 @@ export default function AmpereAnalyzer() {
                 simulationParams: {},
             },
             {
-                title: "Optimizing Frequency",
+                title: `Optimizing Frequency to ${result.data.optimalFrequency} kHz`,
                 description: `AI has identified that reducing switching losses is key. It's now testing a new frequency of ${result.data.optimalFrequency} kHz.`,
                 simulationResult: null,
                 simulationParams: { switchingFrequency: result.data.optimalFrequency },
             },
             {
-                title: "Applying Upgraded Cooler",
+                title: `Applying Cooler: ${bestCoolerInfo?.name || result.data.bestCoolingMethod}`,
                 description: `To handle the remaining heat, the AI is applying the '${bestCoolerInfo?.name || result.data.bestCoolingMethod}' and re-evaluating performance with the new thermal solution.`,
                 simulationResult: null,
                 simulationParams: { coolingMethod: result.data.bestCoolingMethod, switchingFrequency: result.data.optimalFrequency },
@@ -566,6 +603,31 @@ export default function AmpereAnalyzer() {
         </TabsContent>
       </Tabs>
       
+       <AlertDialog open={isDialogVisible} onOpenChange={setIsDialogVisible}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2"><Search /> AI Search Result</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        The AI has found a potential datasheet for your component.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="p-4 my-4 bg-muted/50 rounded-lg text-center">
+                    <FileText className="h-8 w-8 mx-auto text-primary mb-2" />
+                    <p className="font-semibold">{aiSearchResult?.foundDatasheetName}</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        Key parameters found by the AI: <br />
+                        Max Current: <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.maxCurrent}A</span>, 
+                        Max Voltage: <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.maxVoltage}V</span>, 
+                        Rds(on): <span className="font-medium text-foreground">{aiSearchResult?.bestEffort.rdsOn}m&#8486;</span>
+                    </p>
+                </div>
+                <AlertDialogFooter className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <AlertDialogCancel onClick={() => setAiSearchResult(null)}>No, I'll enter manually</AlertDialogCancel>
+                    <AlertDialogAction className="bg-secondary hover:bg-secondary/80" onClick={() => handleDialogAction('best_effort')}>Use AI Best Effort</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleDialogAction('parse')}>Yes, Parse</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

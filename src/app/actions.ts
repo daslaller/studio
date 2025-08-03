@@ -4,45 +4,58 @@ import { z } from "zod";
 import { extractTransistorSpecs } from "@/ai/flows/ai-datasheet-reader";
 import { aiCalculateExpectedResults } from "@/ai/flows/ai-calculate-expected-results";
 import { getAiOptimizationSuggestions } from "@/ai/flows/ai-optimization-advisor";
-import { findAndParseDatasheet } from "@/ai/flows/ai-datasheet-finder";
+import { findDatasheet } from "@/ai/flows/ai-datasheet-finder";
 import { runAiDeepDiveAnalysis } from "@/ai/flows/ai-deep-dive-analysis";
 import type { AiDeepDiveAnalysisInput } from "@/lib/types";
-
 
 const datasheetSchema = z.object({
   componentName: z.string().min(1, "Component name is required."),
   datasheet: z.instanceof(File).optional(),
 });
 
-export async function findOrExtractTransistorSpecsAction(formData: FormData) {
+export async function findDatasheetAction(formData: FormData) {
   try {
     const validated = datasheetSchema.safeParse({
       componentName: formData.get('componentName'),
-      datasheet: formData.get('datasheet'),
     });
 
     if (!validated.success) {
       return { error: "Invalid input.", details: validated.error.format() };
     }
     
-    const { componentName, datasheet } = validated.data;
+    const { componentName } = validated.data;
 
-    // If a datasheet is provided, use the existing extraction flow
-    if (datasheet && datasheet.size > 0) {
-      const buffer = await datasheet.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString("base64");
-      const pdfDataUri = `data:${datasheet.type};base64,${base64}`;
-      const specs = await extractTransistorSpecs({ pdfDataUri, componentName });
-      return { data: specs, source: 'pdf' };
-    }
-
-    // If no datasheet, use the new finder flow
-    const specs = await findAndParseDatasheet({ componentName });
-    return { data: specs, source: 'web' };
+    const searchResult = await findDatasheet({ componentName });
+    return { data: searchResult };
 
   } catch (e) {
     console.error(e);
-    return { error: "Failed to find or extract specs from datasheet." };
+    return { error: "Failed to find datasheet." };
+  }
+}
+
+export async function extractSpecsFromDatasheetAction(formData: FormData) {
+   try {
+    const validated = datasheetSchema.safeParse({
+      componentName: formData.get('componentName'),
+      datasheet: formData.get('datasheet'),
+    });
+
+    if (!validated.success || !validated.data.datasheet) {
+      return { error: "Invalid input.", details: validated.error?.format() };
+    }
+
+    const { componentName, datasheet } = validated.data;
+    
+    const buffer = await datasheet.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const pdfDataUri = `data:${datasheet.type};base64,${base64}`;
+    const specs = await extractTransistorSpecs({ pdfDataUri, componentName });
+    return { data: specs };
+    
+  } catch (e) {
+    console.error(e);
+    return { error: "Failed to extract specs from datasheet." };
   }
 }
 

@@ -35,9 +35,9 @@ body {
     --radius: 0.75rem;
 
     /* Default gradient colors, will be overridden by JS */
-    --gradient-color-1: #9333EA;
-    --gradient-color-2: #2563EB;
-    --gradient-color-3: #EC4899;
+    --gradient-color-1: #9333ea; /* purple-600 */
+    --gradient-color-2: #2563eb; /* blue-600 */
+    --gradient-color-3: #ec4899; /* pink-600 */
   }
   .dark {
     --background: 224 71% 4%;
