@@ -1,17 +1,19 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput } from "@/lib/types";
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, LiveDataPoint } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power, Package, ShieldAlert } from 'lucide-react';
 import React from "react";
+import LiveSimulationView from "./live-simulation-view";
 
 interface ResultsDisplayProps {
   isLoading: boolean;
   simulationResult: SimulationResult | null;
   aiCalculatedResults: AiCalculatedExpectedResultsOutput | null;
   aiOptimizationSuggestions: AiOptimizationSuggestionsOutput | null;
+  liveData: LiveDataPoint[];
+  formValues: any;
 }
 
 const ResultMetric = ({ icon, label, value, unit, colorClass = 'text-primary' }: { icon: React.ElementType, label: string, value: string | number, unit: string, colorClass?: string }) => (
@@ -26,24 +28,22 @@ const ResultMetric = ({ icon, label, value, unit, colorClass = 'text-primary' }:
     </div>
 );
 
-export default function ResultsDisplay({ isLoading, simulationResult, aiCalculatedResults, aiOptimizationSuggestions }: ResultsDisplayProps) {
-  if (isLoading) {
+export default function ResultsDisplay({ 
+  isLoading, 
+  simulationResult, 
+  aiCalculatedResults, 
+  aiOptimizationSuggestions,
+  liveData,
+  formValues
+}: ResultsDisplayProps) {
+
+  if (isLoading && !simulationResult) {
     return (
-      <div className="space-y-6">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-1/2" />
-              <Skeleton className="h-4 w-3/4 mt-2" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <LiveSimulationView 
+        liveData={liveData} 
+        simulationMode={formValues.simulationMode}
+        maxTemperature={formValues.maxTemperature}
+      />
     );
   }
 
@@ -61,7 +61,7 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
 
   const isSuccess = simulationResult.status === 'success';
 
-  const failureIcons = {
+  const failureIcons: { [key: string]: React.ElementType } = {
     Thermal: Thermometer,
     Current: Gauge,
     Voltage: Zap,
@@ -134,5 +134,3 @@ export default function ResultsDisplay({ isLoading, simulationResult, aiCalculat
     </div>
   );
 }
-
-    

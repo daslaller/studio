@@ -52,4 +52,10 @@ export type PredefinedTransistor = {
   specs: ManualSpecs;
 };
 
-    
+export interface LiveDataPoint {
+    current: number;
+    temperature: number;
+    powerLoss: number;
+    progress: number;
+    limitValue: number;
+}
