@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
@@ -90,7 +91,6 @@ export default function AmpereAnalyzer() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
-  const animationFrameId = useRef<number | null>(null);
   const animationIntervalId = useRef<any>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   
@@ -105,7 +105,6 @@ export default function AmpereAnalyzer() {
     }
     // Cleanup interval on component unmount
     return () => {
-      if(animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if(animationIntervalId.current) clearInterval(animationIntervalId.current);
     }
   }, []);
@@ -251,7 +250,7 @@ export default function AmpereAnalyzer() {
 
  const runSimulation = (
     values: FormValues,
-    updateCallback: (data: LiveDataPoint[]) => void
+    updateCallback: (data: LiveDataPoint) => void
   ): Promise<SimulationResult> => {
       
       return new Promise(resolve => {
@@ -374,23 +373,20 @@ export default function AmpereAnalyzer() {
         const CHUNK_SIZE = 20;
 
         const processChunk = () => {
-            let dataChunk: LiveDataPoint[] = [];
             for (let j = 0; j < CHUNK_SIZE && i <= precisionSteps; i++, j++) {
                 if (simulationAlgorithm === 'iterative') {
                     const current = i * (maxCurrent * 1.2 / precisionSteps);
                     const result = checkCurrent(current);
-                    dataChunk.push(addDataPoint(current));
+                    updateCallback(addDataPoint(current));
 
                     if (result.isSafe) {
                         maxSafeCurrent = current;
                     } else {
-                        updateCallback(dataChunk);
                         resolve(buildResult());
                         return;
                     }
                 }
             }
-            updateCallback(dataChunk);
 
             if (i <= precisionSteps) {
                 setTimeout(processChunk, 0); // Yield to main thread
@@ -404,13 +400,12 @@ export default function AmpereAnalyzer() {
         } else { // Binary Search
             let low = 0;
             let high = maxCurrent * 1.5; 
-            let dataQueue: LiveDataPoint[] = [];
             
             for (let k = 0; k < 15; k++) { // 15 steps is enough for high precision
                 let mid = (low + high) / 2;
                 if (mid <= 0) break;
                 const result = checkCurrent(mid);
-                dataQueue.push(addDataPoint(mid));
+                updateCallback(addDataPoint(mid));
 
                 if (result.isSafe) {
                     maxSafeCurrent = mid;
@@ -419,9 +414,6 @@ export default function AmpereAnalyzer() {
                     high = mid;
                 }
             }
-            // Sort data for clean graphing
-            dataQueue.sort((a,b) => a.current - b.current);
-            updateCallback(dataQueue);
             resolve(buildResult());
         }
     });
@@ -430,7 +422,6 @@ export default function AmpereAnalyzer() {
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (animationIntervalId.current) clearInterval(animationIntervalId.current);
 
       setIsDeepDiveRunning(false);
@@ -450,34 +441,24 @@ export default function AmpereAnalyzer() {
       }
       
       const dataQueue: LiveDataPoint[] = [];
-      const updateCallback = (newData: LiveDataPoint[]) => {
-          dataQueue.push(...newData);
+      const updateCallback = (newDataPoint: LiveDataPoint) => {
+          dataQueue.push(newDataPoint);
       };
 
       const animateResults = () => {
-          let i = 0;
-          const frame = () => {
-            if (i < dataQueue.length) {
-                setLiveData(prev => [...prev, dataQueue[i]]);
-                i++;
-                animationFrameId.current = requestAnimationFrame(frame);
-            }
-          };
-
           const smartAnimate = () => {
-              if (dataQueue.length === 0) {
-                  animationIntervalId.current = setTimeout(smartAnimate, 10); // Wait for data
-                  return;
-              };
-
-              const point = dataQueue.shift();
-              if (point) {
-                  setLiveData(prev => [...prev, point]);
+              if (dataQueue.length > 0) {
+                  const point = dataQueue.shift();
+                  if (point) {
+                    // Sort data for binary search for clean graphing
+                    if (values.simulationAlgorithm === 'binary') {
+                        setLiveData(prev => [...prev, point].sort((a,b) => a.current - b.current));
+                    } else {
+                        setLiveData(prev => [...prev, point]);
+                    }
+                  }
               }
-
-              if (dataQueue.length > 0 || isPending) { // isPending check is tricky here
-                  animationIntervalId.current = setTimeout(smartAnimate, 8);
-              }
+              animationIntervalId.current = setTimeout(smartAnimate, 8);
           };
           smartAnimate();
       };
@@ -485,6 +466,17 @@ export default function AmpereAnalyzer() {
       animateResults();
 
       const simResult = await runSimulation(values, updateCallback);
+      
+      // Stop the animation timer once the simulation is complete
+      const stopAnimation = () => {
+        if(dataQueue.length === 0) {
+          if (animationIntervalId.current) clearInterval(animationIntervalId.current);
+        } else {
+          setTimeout(stopAnimation, 100);
+        }
+      }
+      stopAnimation();
+
       setSimulationResult(simResult);
 
       let specsForAi: Partial<ManualSpecs> = {
@@ -536,8 +528,10 @@ export default function AmpereAnalyzer() {
   ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
       const combinedValues = { ...initialValues, ...newValues };
       const dataQueue: LiveDataPoint[] = [];
-      const result = await runSimulation(combinedValues, (newData) => {
-          dataQueue.push(...newData);
+      const result = await new Promise<SimulationResult>((resolve) => {
+        runSimulation(combinedValues, (newData) => {
+            dataQueue.push(newData);
+        }).then(resolve);
       });
       return { result, dataQueue };
   }, [runSimulation]);
@@ -825,7 +819,3 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-
-    
-
-    
