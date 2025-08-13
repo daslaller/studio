@@ -292,7 +292,7 @@ export default function AmpereAnalyzer() {
         };
     };
 
-    const addDataPoint = (current: number) => {
+    const addDataPoint = (current: number, dataArray: LiveDataPoint[]) => {
         const pointResult = checkCurrent(current);
         const { isSafe, ...rest } = pointResult;
         
@@ -327,22 +327,21 @@ export default function AmpereAnalyzer() {
             limitValue
         };
         
-        updateCallback((prev) => [...prev, newDataPoint]);
+        dataArray.push(newDataPoint);
     };
     
     let maxSafeCurrent = 0;
+    let localLiveData: LiveDataPoint[] = [];
     
     if (simulationAlgorithm === 'iterative') {
         const stepSize = (maxCurrent * 1.2) / precisionSteps;
         for (let i = 0; i <= precisionSteps; i++) {
             const current = i * stepSize;
             const result = checkCurrent(current);
+            addDataPoint(current, localLiveData);
             if (result.isSafe) {
                 maxSafeCurrent = current;
-                addDataPoint(current);
-                 await new Promise(resolve => setTimeout(resolve, 10)); // Small delay for rendering
             } else {
-                addDataPoint(current); // Add the failing point for visualization
                 break; // Stop iterating once a failure is detected
             }
         }
@@ -354,8 +353,12 @@ export default function AmpereAnalyzer() {
             let mid = (low + high) / 2;
             if (mid <= 0) break;
             const result = checkCurrent(mid);
-            addDataPoint(mid);
-            await new Promise(resolve => setTimeout(resolve, 50)); // Delay to visualize search
+            addDataPoint(mid, localLiveData);
+            
+            // This is for visual feedback. A small delay allows the UI to update.
+            await new Promise(resolve => setTimeout(resolve, 50)); 
+            updateCallback([...localLiveData].sort((a,b) => a.current - b.current));
+
             if (result.isSafe) {
                 maxSafeCurrent = mid;
                 low = mid;
@@ -363,25 +366,10 @@ export default function AmpereAnalyzer() {
                 high = mid;
             }
         }
-        // Final cleanup for live data - sort and add zero point
-        updateCallback(prev => {
-            const sorted = [...prev].sort((a,b) => a.current - b.current);
-             if (sorted.length > 0 && sorted[0].current > 0) {
-                const zeroPointResult = checkCurrent(0);
-                const zeroDataPoint: LiveDataPoint = {
-                    current: 0,
-                    temperature: zeroPointResult.finalTemperature,
-                    powerLoss: zeroPointResult.powerDissipation.total,
-                    conductionLoss: zeroPointResult.powerDissipation.conduction,
-                    switchingLoss: zeroPointResult.powerDissipation.switching,
-                    progress: 0,
-                    limitValue: 0,
-                }
-                return [zeroDataPoint, ...sorted];
-            }
-            return sorted;
-        });
     }
+
+    // Update the final live data state
+    updateCallback(localLiveData.sort((a,b) => a.current - b.current));
 
     const finalCheck = checkCurrent(maxSafeCurrent);
     if (!finalCheck.isSafe) {
@@ -750,5 +738,3 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-
-    

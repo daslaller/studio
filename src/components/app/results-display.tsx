@@ -126,11 +126,16 @@ export default function ResultsDisplay({
         </CardContent>
       </Card>
 
-       {liveData && liveData.length > 0 && formValues.simulationAlgorithm === 'iterative' && (
+       {liveData && liveData.length > 0 && (
          <Card>
            <CardHeader>
              <CardTitle>Analysis Graph</CardTitle>
-             <CardDescription>Live plot of the iterative simulation.</CardDescription>
+             <CardDescription>
+                {formValues.simulationAlgorithm === 'iterative' 
+                    ? "Plot of the calculated thermal curve." 
+                    : "Live plot of the binary search algorithm."
+                }
+             </CardDescription>
            </CardHeader>
            <CardContent>
               <LiveSimulationView 
@@ -188,5 +193,3 @@ export default function ResultsDisplay({
     </div>
   );
 }
-
-    
