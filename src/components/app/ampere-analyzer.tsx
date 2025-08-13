@@ -90,7 +90,7 @@ export default function AmpereAnalyzer() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
-
+  const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -101,6 +101,12 @@ export default function AmpereAnalyzer() {
       }
     } catch (error) {
         console.error("Could not load history from localStorage", error);
+    }
+    // Cleanup interval on component unmount
+    return () => {
+      if(animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current);
+      }
     }
   }, []);
 
@@ -242,9 +248,11 @@ export default function AmpereAnalyzer() {
     });
   }, [form, toast]);
 
-
-  const runSimulation = (values: FormValues, updateCallback: (data: LiveDataPoint[]) => void): Promise<SimulationResult> => {
-      return new Promise(async (resolve) => {
+ const runSimulation = (
+    values: FormValues,
+    updateCallback: (data: LiveDataPoint[]) => void
+  ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
+    return new Promise((resolve) => {
         const {
         maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
         switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
@@ -259,8 +267,6 @@ export default function AmpereAnalyzer() {
         const tSwitchingSec = ((riseTime || 0) + (fallTime || 0)) * 1e-9;
         const effectiveCoolingBudget = (simulationMode === 'budget' && coolingBudget) ? coolingBudget : selectedCooling.coolingBudget;
 
-
-        // This function checks if a given current is safe and returns the result
         const checkCurrent = (current: number) => {
             let pCond = isMosfetType(transistorType)
                 ? Math.pow(current, 2) * rdsOnOhms * 0.5
@@ -273,26 +279,28 @@ export default function AmpereAnalyzer() {
             let failureReason: SimulationResult['failureReason'] = null;
             let details = '';
 
-            if (simulationMode === 'ftf') {
-                if (finalTemp > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemp.toFixed(2)}°C.`; }
-                else if (powerDissipation && pTotal > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${pTotal.toFixed(2)}W.`; }
-                else if (pTotal > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${pTotal.toFixed(2)}W.`; }
-                else if (current > maxCurrent) { failureReason = 'Current'; details = `Exceeded max current rating of ${maxCurrent.toFixed(2)}A.`; }
-            } else if (simulationMode === 'temp') {
-                if (finalTemp > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemp.toFixed(2)}°C.`; }
+            if (finalTemp > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemp.toFixed(2)}°C.`; }
+            else if (powerDissipation && pTotal > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${pTotal.toFixed(2)}W.`; }
+            else if (pTotal > effectiveCoolingBudget && simulationMode !== 'temp') { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${pTotal.toFixed(2)}W.`; }
+            else if (current > maxCurrent) { failureReason = 'Current'; details = `Exceeded max current rating of ${maxCurrent.toFixed(2)}A.`; }
+
+            let fail = !!failureReason;
+
+            if (simulationMode === 'temp') {
+                fail = finalTemp > maxTemperature;
             } else if (simulationMode === 'budget') {
-                if (pTotal > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${pTotal.toFixed(2)}W.`; }
+                fail = pTotal > effectiveCoolingBudget;
             }
-            
+
             return {
-                isSafe: !failureReason,
+                isSafe: !fail,
                 failureReason,
                 details,
                 finalTemperature: finalTemp,
                 powerDissipation: { total: pTotal, conduction: pCond, switching: pSw }
             };
         };
-
+        
         const addDataPoint = (current: number, dataArray: LiveDataPoint[]) => {
             const pointResult = checkCurrent(current);
             const { isSafe, ...rest } = pointResult;
@@ -309,6 +317,7 @@ export default function AmpereAnalyzer() {
                     limitValue = effectiveCoolingBudget;
                     break;
                 case 'ftf':
+                default:
                     const tempProgress = (rest.finalTemperature / maxTemperature) * 100;
                     const powerProgress = (powerDissipation && powerDissipation > 0) ? (rest.powerDissipation.total / powerDissipation) * 100 : 0;
                     const budgetProgress = (rest.powerDissipation.total / effectiveCoolingBudget) * 100;
@@ -330,68 +339,54 @@ export default function AmpereAnalyzer() {
             
             dataArray.push(newDataPoint);
         };
-        
+
         let maxSafeCurrent = 0;
-        let localLiveData: LiveDataPoint[] = [];
+        let dataQueue: LiveDataPoint[] = [];
         
         if (simulationAlgorithm === 'iterative') {
             const stepSize = (maxCurrent * 1.2) / precisionSteps;
-            
-            let i = 0;
-            const runIteration = () => {
+            for (let i = 0; i <= precisionSteps; i++) {
                 const current = i * stepSize;
                 const result = checkCurrent(current);
-                addDataPoint(current, localLiveData);
-                
+                addDataPoint(current, dataQueue);
                 if (result.isSafe) {
                     maxSafeCurrent = current;
                 } else {
-                    updateCallback([...localLiveData]); // Final update
-                    resolve(buildResult());
-                    return;
-                }
-                
-                updateCallback([...localLiveData]);
-
-                i++;
-                if (i <= precisionSteps) {
-                     setTimeout(runIteration, 8);
-                } else {
-                    updateCallback([...localLiveData]); // Final update
-                    resolve(buildResult());
-                }
-            };
-            runIteration(); // Starts the loop
-            return; // Resolve will be called inside runIteration
-        } else { // Binary Search
-            let low = 0;
-            let high = maxCurrent * 1.5; // Search slightly above max current to find true thermal limit
-            
-            for (let i = 0; i < 15; i++) { // 15 iterations are enough for high precision
-                let mid = (low + high) / 2;
-                if (mid <= 0) break;
-                const result = checkCurrent(mid);
-                addDataPoint(mid, localLiveData);
-                
-                // This is for visual feedback. A small delay allows the UI to update.
-                await new Promise(r => setTimeout(r, 50)); 
-                updateCallback([...localLiveData].sort((a,b) => a.current - b.current));
-
-                if (result.isSafe) {
-                    maxSafeCurrent = mid;
-                    low = mid;
-                } else {
-                    high = mid;
+                    break; // Stop at first failure
                 }
             }
-            updateCallback(localLiveData.sort((a,b) => a.current - b.current));
-            resolve(buildResult());
+            resolve({ result: buildResult(), dataQueue });
+
+        } else { // Binary Search
+            let low = 0;
+            let high = maxCurrent * 1.5; 
+            
+            const runBinarySearch = async () => {
+                for (let i = 0; i < 15; i++) {
+                    let mid = (low + high) / 2;
+                    if (mid <= 0) break;
+                    const result = checkCurrent(mid);
+                    addDataPoint(mid, dataQueue);
+                    
+                    updateCallback([...dataQueue].sort((a, b) => a.current - b.current));
+                    await new Promise(r => setTimeout(r, 50)); 
+
+                    if (result.isSafe) {
+                        maxSafeCurrent = mid;
+                        low = mid;
+                    } else {
+                        high = mid;
+                    }
+                }
+                updateCallback(dataQueue.sort((a,b) => a.current - b.current));
+                resolve({ result: buildResult(), dataQueue });
+            };
+            runBinarySearch();
         }
 
         function buildResult(): SimulationResult {
             const finalCheck = checkCurrent(maxSafeCurrent);
             if (!finalCheck.isSafe) {
-                // This can happen if the very first step is unsafe
                 if (maxSafeCurrent === 0) {
                      return {
                         status: 'failure',
@@ -421,12 +416,14 @@ export default function AmpereAnalyzer() {
             }
         }
     });
-};
+  };
 
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      // Clear all previous results immediately
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current);
+      }
       setIsDeepDiveRunning(false);
       setSimulationResult(null);
       setAiCalculatedResults(null);
@@ -434,7 +431,6 @@ export default function AmpereAnalyzer() {
       setLiveData([]);
       scrollToResults();
       
-      // Add a small delay to ensure the UI has time to clear before simulation starts
       await new Promise(resolve => setTimeout(resolve, 50));
 
 
@@ -447,7 +443,22 @@ export default function AmpereAnalyzer() {
         return;
       }
 
-      const simResult = await runSimulation(values, setLiveData);
+      const { result: simResult, dataQueue } = await runSimulation(values, setLiveData);
+      
+      if (values.simulationAlgorithm === 'iterative') {
+          let i = 0;
+          animationIntervalRef.current = setInterval(() => {
+              if (i < dataQueue.length) {
+                  setLiveData(prev => [...prev, dataQueue[i]]);
+                  i++;
+              } else {
+                  if(animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+              }
+          }, 8); // 8ms for smooth animation
+      } else {
+          setLiveData(dataQueue.sort((a,b) => a.current - b.current));
+      }
+      
       setSimulationResult(simResult);
 
       let specsForAi: Partial<ManualSpecs> = {
@@ -499,8 +510,8 @@ export default function AmpereAnalyzer() {
       updateCallback: (data: LiveDataPoint[]) => void
   ) => {
       const combinedValues = { ...initialValues, ...newValues };
-      const simResult = await runSimulation(combinedValues, updateCallback);
-      return simResult;
+      const { result } = await runSimulation(combinedValues, updateCallback);
+      return result;
   }, []);
 
   const handleAiDeepDive = useCallback(async () => {
@@ -770,5 +781,3 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-
-    
