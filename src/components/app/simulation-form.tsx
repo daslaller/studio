@@ -187,7 +187,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                           <FormField control={form.control} name="rdsOn" render={({ field }) => (
                               <FormItem>
                                   <FormLabel>RDS(on) (m&#8486;)</FormLabel>
-                                  <FormControl><Input type="number" step="any" placeholder="e.g., 17.5" {...field} /></FormControl>
+                                  <FormControl><Input type="number" step="any" placeholder="e.g., 17.5" {...field} value={field.value ?? ''} /></FormControl>
                                   <FormMessage />
                               </FormItem>
                           )} />
@@ -195,7 +195,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                           <FormField control={form.control} name="vceSat" render={({ field }) => (
                               <FormItem>
                                   <FormLabel>Vce(sat) (V)</FormLabel>
-                                  <FormControl><Input type="number" step="any" placeholder="e.g., 1.2" {...field} /></FormControl>
+                                  <FormControl><Input type="number" step="any" placeholder="e.g., 1.2" {...field} value={field.value ?? ''}/></FormControl>
                                   <FormMessage />
                               </FormItem>
                           )} />
@@ -203,49 +203,49 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                       <FormField control={form.control} name="rthJC" render={({ field }) => (
                           <FormItem>
                               <FormLabel>Rth (j-c) (°C/W)</FormLabel>
-                              <FormControl><Input type="number" step="any" placeholder="e.g., 1.5" {...field} /></FormControl>
+                              <FormControl><Input type="number" step="any" placeholder="e.g., 1.5" {...field} value={field.value ?? ''} /></FormControl>
                               <FormMessage />
                           </FormItem>
                       )} />
                       <FormField control={form.control} name="maxCurrent" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Max Current (A)</FormLabel>
-                          <FormControl><Input type="number" step="any" placeholder="e.g., 49" {...field} /></FormControl>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 49" {...field} value={field.value ?? ''} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="maxVoltage" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Max Voltage (V)</FormLabel>
-                          <FormControl><Input type="number" step="any" placeholder="e.g., 55" {...field} /></FormControl>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 55" {...field} value={field.value ?? ''} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
                        <FormField control={form.control} name="powerDissipation" render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Max Power (W)</FormLabel>
-                          <FormControl><Input type="number" step="any" placeholder="e.g., 94" {...field} /></FormControl>
+                          <FormLabel>Max Power (W) (Optional)</FormLabel>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 94" {...field} value={field.value ?? ''} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="maxTemperature" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Max Junction Temp (°C)</FormLabel>
-                            <FormControl><Input type="number" placeholder="e.g. 150" {...field} /></FormControl>
+                            <FormControl><Input type="number" placeholder="e.g. 150" {...field} value={field.value ?? ''} /></FormControl>
                             <FormMessage />
                         </FormItem>
                      )} />
                       <FormField control={form.control} name="riseTime" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Rise Time (ns)</FormLabel>
-                          <FormControl><Input type="number" step="any" placeholder="e.g., 60" {...field} /></FormControl>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 60" {...field} value={field.value ?? ''} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="fallTime" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fall Time (ns)</FormLabel>
-                          <FormControl><Input type="number" step="any" placeholder="e.g., 45" {...field} /></FormControl>
+                          <FormControl><Input type="number" step="any" placeholder="e.g., 45" {...field} value={field.value ?? ''} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
@@ -267,14 +267,14 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                 <FormField control={form.control} name="switchingFrequency" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Switching Frequency (kHz)</FormLabel>
-                      <FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl>
+                      <FormControl><Input type="number" placeholder="e.g., 100" {...field} value={field.value ?? ''} /></FormControl>
                       <FormMessage />
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="ambientTemperature" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Ambient Temperature (°C)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 25" {...field} /></FormControl>
+                    <FormControl><Input type="number" placeholder="e.g., 25" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -385,7 +385,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                         <FormField control={form.control} name="coolingBudget" render={({ field }) => (
                             <FormItem className="mt-4">
                                 <FormLabel>Manual Cooling Budget (W)</FormLabel>
-                                <FormControl><Input type="number" placeholder={`e.g., ${selectedCoolingMethod?.coolingBudget || 250}`} {...field} /></FormControl>
+                                <FormControl><Input type="number" placeholder={`e.g., ${selectedCoolingMethod?.coolingBudget || 250}`} {...field} value={field.value ?? ''} /></FormControl>
                                 <FormDescription>Override the selected cooler's budget.</FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -412,3 +412,5 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
+
+    

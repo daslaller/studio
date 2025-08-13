@@ -30,7 +30,7 @@ const formSchema = z.object({
   transistorType: z.string().min(1, 'Transistor type is required.'),
   maxCurrent: z.coerce.number().positive(),
   maxVoltage: z.coerce.number().positive(),
-  powerDissipation: z.coerce.number().positive(),
+  powerDissipation: z.coerce.number().positive().optional(),
   rdsOn: z.coerce.number().optional(), // mOhms
   vceSat: z.coerce.number().optional(), // V
   riseTime: z.coerce.number().positive(), // ns
@@ -281,7 +281,7 @@ export default function AmpereAnalyzer() {
           let fail = false;
           if (simulationMode === 'ftf') {
             if (finalTemperature > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemperature.toFixed(2)}°C.`; fail = true; }
-            else if (totalLoss > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
+            else if (powerDissipation && totalLoss > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
             else if (totalLoss > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
             else if (current > maxCurrent) { failureReason = 'Current'; details = `Exceeded max current rating of ${maxCurrent.toFixed(2)}A.`; fail = true; }
           } else if (simulationMode === 'temp') {
@@ -311,7 +311,7 @@ export default function AmpereAnalyzer() {
                   break;
               case 'ftf':
                   const tempProgress = (finalTemperature / maxTemperature) * 100;
-                  const powerProgress = (totalLoss / powerDissipation) * 100;
+                  const powerProgress = (powerDissipation && powerDissipation > 0) ? (totalLoss / powerDissipation) * 100 : 0;
                   const budgetProgress = (totalLoss / effectiveCoolingBudget) * 100;
                   const currentProgress = (current / maxCurrent) * 100;
                   progress = Math.max(tempProgress, powerProgress, budgetProgress, currentProgress);
@@ -690,3 +690,5 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
