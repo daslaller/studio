@@ -341,7 +341,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                             </RadioGroup>
                              <FormDescription className="flex items-center gap-1.5 pt-1">
                                 <Info className="h-3 w-3" />
-                                Iterative calculates the full curve. Binary Search is faster.
+                                Iterative provides a live visual of the calculation process.
                             </FormDescription>
                         </FormItem>
                     )}
@@ -362,7 +362,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                 <FormItem>
                                     <FormLabel>Precision (Steps)</FormLabel>
                                     <FormControl><Input type="number" placeholder="e.g., 200" {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormDescription>Higher steps (max 500) improve precision but require more computation.</FormDescription>
+                                    <FormDescription>Higher steps (max 500) improve precision of the graph.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -464,3 +464,5 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
+
+    
