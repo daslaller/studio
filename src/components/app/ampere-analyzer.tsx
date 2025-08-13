@@ -240,113 +240,131 @@ export default function AmpereAnalyzer() {
 
 
   const runSimulation = async (values: FormValues, updateCallback: (data: LiveDataPoint[]) => void): Promise<SimulationResult> => {
-      const {
-        maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
-        switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
-        transistorType, rdsOn, vceSat, simulationMode, coolingBudget
-      } = values;
+    const {
+      maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
+      switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
+      transistorType, rdsOn, vceSat, simulationMode, coolingBudget
+    } = values;
 
-      const selectedCooling = coolingMethods.find(c => c.value === coolingMethod) as CoolingMethod;
-      const totalRth = rthJC + selectedCooling.thermalResistance;
-      
-      const rdsOnOhms = (rdsOn || 0) / 1000;
-      const fSwHz = switchingFrequency * 1000;
-      const tSwitchingSec = ((riseTime || 0) + (fallTime || 0)) * 1e-9;
+    const selectedCooling = coolingMethods.find(c => c.value === coolingMethod) as CoolingMethod;
+    const totalRth = rthJC + selectedCooling.thermalResistance;
+    const rdsOnOhms = (rdsOn || 0) / 1000;
+    const fSwHz = switchingFrequency * 1000;
+    const tSwitchingSec = ((riseTime || 0) + (fallTime || 0)) * 1e-9;
+    const effectiveCoolingBudget = (simulationMode === 'budget' && coolingBudget) ? coolingBudget : selectedCooling.coolingBudget;
 
-      let maxSafeCurrent = 0;
-      let failureReason: SimulationResult['failureReason'] = null;
-      let details = '';
-      let finalTemperature = ambientTemperature;
-      let powerLoss = { total: 0, conduction: 0, switching: 0 };
-      
-      const step = Math.max(0.01, maxCurrent / 2000);
-      const dataPoints: LiveDataPoint[] = [];
 
-      for (let current = step; current <= maxCurrent + step; current += step) {
-          let conductionLoss = isMosfetType(transistorType)
-              ? Math.pow(current, 2) * rdsOnOhms * 0.5
-              : current * (vceSat || 0) * 0.5;
-          const switchingLoss = 0.5 * maxVoltage * current * tSwitchingSec * fSwHz;
-          const totalLoss = conductionLoss + switchingLoss;
+    // This function checks if a given current is safe and returns the result
+    const checkCurrent = (current: number) => {
+        let pCond = isMosfetType(transistorType)
+            ? Math.pow(current, 2) * rdsOnOhms * 0.5
+            : current * (vceSat || 0) * 0.5;
+        const pSw = 0.5 * maxVoltage * current * tSwitchingSec * fSwHz;
+        const pTotal = pCond + pSw;
+        const tempRise = pTotal * totalRth;
+        const finalTemp = ambientTemperature + tempRise;
 
-          powerLoss = { total: totalLoss, conduction: conductionLoss, switching: switchingLoss };
-          const tempRise = totalLoss * totalRth;
-          finalTemperature = ambientTemperature + tempRise;
-          const effectiveCoolingBudget = (simulationMode === 'budget' && coolingBudget) ? coolingBudget : selectedCooling.coolingBudget;
-          
-          let progress = 0;
-          let limitValue = 0;
+        let failureReason: SimulationResult['failureReason'] = null;
+        let details = '';
 
-          // Check failure conditions based on simulation mode
-          let fail = false;
-          if (simulationMode === 'ftf') {
-            if (finalTemperature > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemperature.toFixed(2)}°C.`; fail = true; }
-            else if (powerDissipation && totalLoss > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
-            else if (totalLoss > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
-            else if (current > maxCurrent) { failureReason = 'Current'; details = `Exceeded max current rating of ${maxCurrent.toFixed(2)}A.`; fail = true; }
-          } else if (simulationMode === 'temp') {
-            if (finalTemperature > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemperature.toFixed(2)}°C.`; fail = true; }
-          } else if (simulationMode === 'budget') {
-            if (totalLoss > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${totalLoss.toFixed(2)}W.`; fail = true; }
-          }
-          
-          if (fail) {
-              maxSafeCurrent = current - step;
-              const lastSafeConductionLoss = isMosfetType(transistorType) ? Math.pow(maxSafeCurrent, 2) * rdsOnOhms * 0.5 : maxSafeCurrent * (vceSat || 0) * 0.5;
-              const lastSafeSwitchingLoss = 0.5 * maxVoltage * maxSafeCurrent * tSwitchingSec * fSwHz;
-              const lastSafeTotalLoss = lastSafeConductionLoss + lastSafeSwitchingLoss;
-              const lastSafeTempRise = lastSafeTotalLoss * totalRth;
-              
-              return { status: 'failure', maxSafeCurrent, failureReason, details, finalTemperature: ambientTemperature + lastSafeTempRise, powerDissipation: { total: lastSafeTotalLoss, conduction: lastSafeConductionLoss, switching: lastSafeSwitchingLoss } };
-          }
-          
-          switch (simulationMode) {
-              case 'temp':
-                  progress = (finalTemperature / maxTemperature) * 100;
-                  limitValue = maxTemperature;
-                  break;
-              case 'budget':
-                  progress = (totalLoss / effectiveCoolingBudget) * 100;
-                  limitValue = effectiveCoolingBudget;
-                  break;
-              case 'ftf':
-                  const tempProgress = (finalTemperature / maxTemperature) * 100;
-                  const powerProgress = (powerDissipation && powerDissipation > 0) ? (totalLoss / powerDissipation) * 100 : 0;
-                  const budgetProgress = (totalLoss / effectiveCoolingBudget) * 100;
-                  const currentProgress = (current / maxCurrent) * 100;
-                  progress = Math.max(tempProgress, powerProgress, budgetProgress, currentProgress);
-                  limitValue = 100; // In FTF, the limit is reaching 100% of any of the individual limits
-                  break;
-              default: 
-                  progress = (current / maxCurrent) * 100;
-                  limitValue = maxCurrent;
-          }
+        if (simulationMode === 'ftf') {
+            if (finalTemp > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemp.toFixed(2)}°C.`; }
+            else if (powerDissipation && pTotal > powerDissipation) { failureReason = 'Power Dissipation'; details = `Exceeded component's max power dissipation of ${powerDissipation}W. Reached ${pTotal.toFixed(2)}W.`; }
+            else if (pTotal > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${pTotal.toFixed(2)}W.`; }
+            else if (current > maxCurrent) { failureReason = 'Current'; details = `Exceeded max current rating of ${maxCurrent.toFixed(2)}A.`; }
+        } else if (simulationMode === 'temp') {
+            if (finalTemp > maxTemperature) { failureReason = 'Thermal'; details = `Exceeded max junction temp of ${maxTemperature}°C. Reached ${finalTemp.toFixed(2)}°C.`; }
+        } else if (simulationMode === 'budget') {
+            if (pTotal > effectiveCoolingBudget) { failureReason = 'Cooling Budget'; details = `Exceeded cooling budget of ${effectiveCoolingBudget}W. Reached ${pTotal.toFixed(2)}W.`; }
+        }
+        
+        return {
+            isSafe: !failureReason,
+            failureReason,
+            details,
+            finalTemperature: finalTemp,
+            powerDissipation: { total: pTotal, conduction: pCond, switching: pSw }
+        };
+    };
 
-          const newPoint: LiveDataPoint = {
-              current,
-              temperature: finalTemperature,
-              powerLoss: totalLoss,
-              conductionLoss: powerLoss.conduction,
-              switchingLoss: powerLoss.switching,
-              progress: Math.min(progress, 100),
-              limitValue
-          };
-          
-          dataPoints.push(newPoint);
-          
-          // Update UI periodically to avoid performance issues
-          if (dataPoints.length % 10 === 0) {
-              updateCallback([...dataPoints]);
-              await new Promise(resolve => setTimeout(resolve, 10)); // small delay to allow UI to render
-          }
+    // Binary search for the maximum safe current
+    let low = 0;
+    let high = maxCurrent * 1.5; // Search slightly above max current to find true thermal limit
+    let maxSafeCurrent = 0;
+    
+    for (let i = 0; i < 20; i++) { // 20 iterations are enough for high precision
+        let mid = (low + high) / 2;
+        if (mid <= 0) break;
+        const result = checkCurrent(mid);
+        if (result.isSafe) {
+            maxSafeCurrent = mid;
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+    
+    const finalResult = checkCurrent(maxSafeCurrent);
 
-          maxSafeCurrent = current;
-      }
-      
-      updateCallback([...dataPoints]); // Send final data
-      const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
-      return { status: 'success', maxSafeCurrent: safeCurrent, failureReason: null, details: `Device operates safely up to its max rating of ${safeCurrent.toFixed(2)}A within all limits.`, finalTemperature, powerDissipation: powerLoss };
-  };
+    // Generate live data for the chart display after finding the result
+    const dataPoints: LiveDataPoint[] = [];
+    const steps = 100;
+    for (let i = 0; i <= steps; i++) {
+        const current = (maxSafeCurrent / steps) * i;
+        const pointResult = checkCurrent(current);
+        const { isSafe, ...rest } = pointResult;
+        
+        let progress = 0;
+        let limitValue = 0;
+        switch (simulationMode) {
+            case 'temp':
+                progress = (rest.finalTemperature / maxTemperature) * 100;
+                limitValue = maxTemperature;
+                break;
+            case 'budget':
+                progress = (rest.powerDissipation.total / effectiveCoolingBudget) * 100;
+                limitValue = effectiveCoolingBudget;
+                break;
+            case 'ftf':
+                const tempProgress = (rest.finalTemperature / maxTemperature) * 100;
+                const powerProgress = (powerDissipation && powerDissipation > 0) ? (rest.powerDissipation.total / powerDissipation) * 100 : 0;
+                const budgetProgress = (rest.powerDissipation.total / effectiveCoolingBudget) * 100;
+                const currentProgress = (current / maxCurrent) * 100;
+                progress = Math.max(tempProgress, powerProgress, budgetProgress, currentProgress);
+                limitValue = 100;
+                break;
+        }
+        
+        dataPoints.push({
+            current,
+            temperature: rest.finalTemperature,
+            powerLoss: rest.powerDissipation.total,
+            conductionLoss: rest.powerDissipation.conduction,
+            switchingLoss: rest.powerDissipation.switching,
+            progress: Math.min(progress, 100),
+            limitValue
+        });
+    }
+    updateCallback(dataPoints);
+
+    const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
+    const finalCheck = checkCurrent(safeCurrent);
+    if (finalCheck.isSafe) {
+        return {
+            status: 'success',
+            maxSafeCurrent: safeCurrent,
+            failureReason: null,
+            details: `Device operates safely up to its max rating of ${safeCurrent.toFixed(2)}A within all limits.`,
+            ...finalCheck
+        };
+    } else {
+         return {
+            status: 'failure',
+            maxSafeCurrent: safeCurrent,
+            ...finalCheck
+        };
+    }
+};
 
 
   const onSubmit = (values: FormValues) => {
@@ -690,5 +708,7 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
 
     
