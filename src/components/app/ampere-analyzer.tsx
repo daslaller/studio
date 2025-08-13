@@ -90,7 +90,7 @@ export default function AmpereAnalyzer() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
-  const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameId = useRef<number | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -104,8 +104,8 @@ export default function AmpereAnalyzer() {
     }
     // Cleanup interval on component unmount
     return () => {
-      if(animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current);
+      if(animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       }
     }
   }, []);
@@ -248,10 +248,13 @@ export default function AmpereAnalyzer() {
     });
   }, [form, toast]);
 
+
  const runSimulation = (
     values: FormValues,
-    updateCallback?: (data: LiveDataPoint[]) => void
-  ): { result: SimulationResult, dataQueue: LiveDataPoint[] } => {
+    updateCallback: (data: LiveDataPoint) => void
+  ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
+      
+      return new Promise(resolve => {
         const {
         maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
         switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
@@ -300,7 +303,7 @@ export default function AmpereAnalyzer() {
             };
         };
         
-        const addDataPoint = (current: number, dataArray: LiveDataPoint[]) => {
+        const addDataPoint = (current: number) => {
             const pointResult = checkCurrent(current);
             const { isSafe, ...rest } = pointResult;
             
@@ -336,34 +339,78 @@ export default function AmpereAnalyzer() {
                 limitValue
             };
             
-            dataArray.push(newDataPoint);
+            return newDataPoint;
         };
 
         let maxSafeCurrent = 0;
         let dataQueue: LiveDataPoint[] = [];
+
+        const buildResult = (): SimulationResult => {
+            const finalCheck = checkCurrent(maxSafeCurrent);
+            if (maxSafeCurrent <= 0 && !finalCheck.isSafe) {
+                 return {
+                    status: 'failure',
+                    maxSafeCurrent: 0,
+                    failureReason: finalCheck.failureReason,
+                    details: `Component fails even at 0A. ${finalCheck.details}`,
+                    finalTemperature: finalCheck.finalTemperature,
+                    powerDissipation: finalCheck.powerDissipation,
+                };
+            }
+            
+            const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
+            const cappedFinalCheck = checkCurrent(safeCurrent);
+            
+            return {
+                status: 'success',
+                maxSafeCurrent: safeCurrent,
+                failureReason: null,
+                details: `Device operates safely up to ${safeCurrent.toFixed(2)}A within all limits.`,
+                finalTemperature: cappedFinalCheck.finalTemperature,
+                powerDissipation: cappedFinalCheck.powerDissipation,
+            };
+        }
         
-        if (simulationAlgorithm === 'iterative') {
-            const stepSize = (maxCurrent * 1.2) / precisionSteps;
-            for (let i = 0; i <= precisionSteps; i++) {
-                const current = i * stepSize;
-                const result = checkCurrent(current);
-                addDataPoint(current, dataQueue);
-                if (result.isSafe) {
-                    maxSafeCurrent = current;
-                } else {
-                    break; // Stop at first failure
+        let i = 0;
+        const CHUNK_SIZE = 50; // Process 50 steps at a time
+
+        const processChunk = () => {
+            for (let j = 0; j < CHUNK_SIZE && i <= precisionSteps; i++, j++) {
+                if (simulationAlgorithm === 'iterative') {
+                    const current = i * (maxCurrent * 1.2 / precisionSteps);
+                    const result = checkCurrent(current);
+                    const point = addDataPoint(current);
+                    dataQueue.push(point);
+                    updateCallback(point);
+
+                    if (result.isSafe) {
+                        maxSafeCurrent = current;
+                    } else {
+                        resolve({ result: buildResult(), dataQueue });
+                        return;
+                    }
                 }
             }
-
+             if (i <= precisionSteps) {
+                setTimeout(processChunk, 0); // Yield to main thread
+            } else {
+                resolve({ result: buildResult(), dataQueue });
+            }
+        }
+        
+        if (simulationAlgorithm === 'iterative') {
+            processChunk();
         } else { // Binary Search
             let low = 0;
             let high = maxCurrent * 1.5; 
             
-            for (let i = 0; i < 15; i++) { // 15 steps is enough for high precision
+            for (let k = 0; k < 15; k++) { // 15 steps is enough for high precision
                 let mid = (low + high) / 2;
                 if (mid <= 0) break;
                 const result = checkCurrent(mid);
-                addDataPoint(mid, dataQueue);
+                const point = addDataPoint(mid);
+                dataQueue.push(point);
+                updateCallback(point);
 
                 if (result.isSafe) {
                     maxSafeCurrent = mid;
@@ -374,47 +421,16 @@ export default function AmpereAnalyzer() {
             }
             // Sort data for clean graphing
             dataQueue.sort((a,b) => a.current - b.current);
+            resolve({result: buildResult(), dataQueue});
         }
-
-        const buildResult = (): SimulationResult => {
-            const finalCheck = checkCurrent(maxSafeCurrent);
-            if (!finalCheck.isSafe) {
-                if (maxSafeCurrent === 0) {
-                     return {
-                        status: 'failure',
-                        maxSafeCurrent: 0,
-                        failureReason: finalCheck.failureReason,
-                        details: `Component fails even at 0A. ${finalCheck.details}`,
-                        finalTemperature: finalCheck.finalTemperature,
-                        powerDissipation: finalCheck.powerDissipation,
-                    };
-                }
-                const resultAtFailure = checkCurrent(maxSafeCurrent);
-                return {
-                    status: 'failure',
-                    maxSafeCurrent: maxSafeCurrent,
-                    ...resultAtFailure
-                };
-            } else {
-                const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
-                const cappedFinalCheck = checkCurrent(safeCurrent);
-                return {
-                    status: 'success',
-                    maxSafeCurrent: safeCurrent,
-                    failureReason: null,
-                    details: `Device operates safely up to ${safeCurrent.toFixed(2)}A within all limits.`,
-                    ...cappedFinalCheck
-                };
-            }
-        }
-        return { result: buildResult(), dataQueue };
+    });
   };
 
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       }
       setIsDeepDiveRunning(false);
       setSimulationResult(null);
@@ -432,20 +448,11 @@ export default function AmpereAnalyzer() {
         return;
       }
       
-      // Run the synchronous calculation
-      const { result: simResult, dataQueue } = runSimulation(values);
-      setSimulationResult(simResult);
+      const { result: simResult, dataQueue } = await runSimulation(values, (point) => {
+           setLiveData(prev => [...prev, point]);
+      });
 
-      // Animate the results from the queue
-      let i = 0;
-      animationIntervalRef.current = setInterval(() => {
-          if (i < dataQueue.length) {
-              setLiveData(prev => [...prev, dataQueue[i]]);
-              i++;
-          } else {
-              if(animationIntervalRef.current) clearInterval(animationIntervalRef.current);
-          }
-      }, 8);
+      setSimulationResult(simResult);
 
       let specsForAi: Partial<ManualSpecs> = {
           maxCurrent: String(values.maxCurrent),
@@ -493,11 +500,10 @@ export default function AmpereAnalyzer() {
   const runDeepDiveSimulation = useCallback((
       initialValues: FormValues,
       newValues: Partial<FormValues>
-  ) => {
+  ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
       const combinedValues = { ...initialValues, ...newValues };
       // Deep dive always runs synchronously and returns the full data queue for animation
-      const { result, dataQueue } = runSimulation(combinedValues);
-      return { result, dataQueue };
+      return runSimulation(combinedValues, () => {}); // no live update needed for deep dive steps
   }, []);
 
   const handleAiDeepDive = useCallback(async () => {
@@ -512,7 +518,7 @@ export default function AmpereAnalyzer() {
         setDeepDiveSteps([]);
         setLiveData([]);
         scrollToResults();
-        if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+        if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
 
         const values = form.getValues();
         const componentName = values.predefinedComponent
@@ -585,18 +591,20 @@ export default function AmpereAnalyzer() {
         // This function will animate a single simulation's data
         const animateSimulationData = (dataQueue: LiveDataPoint[]) => {
             return new Promise<void>((resolve) => {
-                if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+                if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
                 setLiveData([]);
                 let i = 0;
-                animationIntervalRef.current = setInterval(() => {
-                    if (i < dataQueue.length) {
-                        setLiveData(prev => [...prev, dataQueue[i]]);
-                        i++;
-                    } else {
-                        if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
-                        resolve();
-                    }
-                }, 8);
+                
+                const animate = () => {
+                  if (i < dataQueue.length) {
+                    setLiveData(prev => [...prev, dataQueue[i]]);
+                    i++;
+                    setTimeout(animate, 8);
+                  } else {
+                    resolve();
+                  }
+                }
+                animate();
             });
         };
 
@@ -606,13 +614,13 @@ export default function AmpereAnalyzer() {
             const step = simulationSteps[i];
 
             if(step.simulationResult === null && Object.keys(step.simulationParams).length > 0) {
-                const { result: stepSimResult, dataQueue } = runDeepDiveSimulation(values, step.simulationParams);
+                const { result: stepSimResult, dataQueue } = await runDeepDiveSimulation(values, step.simulationParams);
                 simulationSteps[i].simulationResult = stepSimResult;
                 setDeepDiveSteps([...simulationSteps]);
                 await animateSimulationData(dataQueue);
                 
             } else if (step.simulationResult) {
-                 const { dataQueue } = runDeepDiveSimulation(values, {});
+                 const { dataQueue } = await runDeepDiveSimulation(values, {});
                  await animateSimulationData(dataQueue);
             }
 
@@ -780,5 +788,7 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
 
     

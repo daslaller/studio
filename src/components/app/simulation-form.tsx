@@ -342,7 +342,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                              <FormDescription className="flex items-center gap-1.5 pt-1">
                                 <Info className="h-3 w-3" />
                                 {simulationAlgorithm === 'iterative' 
-                                    ? "Provides a smooth, live visualization of the calculation process."
+                                    ? "Provides a live visualization of the thermal curve."
                                     : "Quickly finds the limit with a 'go-high, go-low' animated view."
                                 }
                             </FormDescription>
@@ -365,7 +365,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                 <FormItem>
                                     <FormLabel>Precision (Steps)</FormLabel>
                                     <FormControl><Input type="number" placeholder="e.g., 200" {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormDescription>Higher steps (max 500) improve graph smoothness. Does not affect performance.</FormDescription>
+                                    <FormDescription>Higher steps (max 500) provide more data points for the graph.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -467,5 +467,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     </Form>
   );
 }
+
+    
 
     
