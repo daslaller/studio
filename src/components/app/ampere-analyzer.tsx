@@ -389,7 +389,7 @@ export default function AmpereAnalyzer() {
             }
 
             if (i <= precisionSteps) {
-                setTimeout(processChunk, 0); // Yield to main thread
+                setTimeout(processChunk, 0); // Yield to main thread to prevent blocking
             } else {
                 resolve(buildResult());
             }
@@ -401,9 +401,16 @@ export default function AmpereAnalyzer() {
             let low = 0;
             let high = maxCurrent * 1.5; 
             
-            for (let k = 0; k < 15; k++) { // 15 steps is enough for high precision
+            const runBinaryStep = () => {
+                 if (high - low < 0.01) {
+                    resolve(buildResult());
+                    return;
+                }
                 let mid = (low + high) / 2;
-                if (mid <= 0) break;
+                if (mid <= 0) {
+                    resolve(buildResult());
+                    return;
+                }
                 const result = checkCurrent(mid);
                 updateCallback(addDataPoint(mid));
 
@@ -413,8 +420,9 @@ export default function AmpereAnalyzer() {
                 } else {
                     high = mid;
                 }
+                setTimeout(runBinaryStep, 50); // Small delay for animation
             }
-            resolve(buildResult());
+            runBinaryStep();
         }
     });
   };
@@ -422,9 +430,11 @@ export default function AmpereAnalyzer() {
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      if (animationIntervalId.current) clearInterval(animationIntervalId.current);
+      if (animationIntervalId.current) {
+        clearInterval(animationIntervalId.current);
+        animationIntervalId.current = null;
+      }
 
-      setIsDeepDiveRunning(false);
       setSimulationResult(null);
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
@@ -441,42 +451,40 @@ export default function AmpereAnalyzer() {
       }
       
       const dataQueue: LiveDataPoint[] = [];
+      let isSimulationRunning = true;
+
       const updateCallback = (newDataPoint: LiveDataPoint) => {
           dataQueue.push(newDataPoint);
       };
-
-      const animateResults = () => {
-          const smartAnimate = () => {
-              if (dataQueue.length > 0) {
-                  const point = dataQueue.shift();
-                  if (point) {
-                    // Sort data for binary search for clean graphing
-                    if (values.simulationAlgorithm === 'binary') {
-                        setLiveData(prev => [...prev, point].sort((a,b) => a.current - b.current));
-                    } else {
-                        setLiveData(prev => [...prev, point]);
-                    }
-                  }
-              }
-              animationIntervalId.current = setTimeout(smartAnimate, 8);
-          };
-          smartAnimate();
-      };
       
-      animateResults();
+      const animationLoop = () => {
+        if (dataQueue.length > 0) {
+            const pointToRender = values.simulationAlgorithm === 'binary' 
+                ? dataQueue.shift()! // For binary, render as they come
+                : dataQueue.splice(0, Math.max(1, Math.floor(dataQueue.length / 10))).pop()!; // For iterative, skip frames to keep up
+
+            if (pointToRender) {
+                setLiveData(prev => {
+                    const newData = [...prev, pointToRender];
+                    if (values.simulationAlgorithm === 'binary') {
+                        return newData.sort((a,b) => a.current - b.current);
+                    }
+                    return newData;
+                });
+            }
+        }
+
+        if (!isSimulationRunning && dataQueue.length === 0) {
+            clearInterval(animationIntervalId.current);
+            animationIntervalId.current = null;
+        }
+      }
+      
+      animationIntervalId.current = setInterval(animationLoop, 8);
 
       const simResult = await runSimulation(values, updateCallback);
       
-      // Stop the animation timer once the simulation is complete
-      const stopAnimation = () => {
-        if(dataQueue.length === 0) {
-          if (animationIntervalId.current) clearInterval(animationIntervalId.current);
-        } else {
-          setTimeout(stopAnimation, 100);
-        }
-      }
-      stopAnimation();
-
+      isSimulationRunning = false;
       setSimulationResult(simResult);
 
       let specsForAi: Partial<ManualSpecs> = {
@@ -621,21 +629,30 @@ export default function AmpereAnalyzer() {
         // This function will animate a single simulation's data
         const animateSimulationData = (dataQueue: LiveDataPoint[]) => {
             return new Promise<void>((resolve) => {
-                if (animationIntervalId.current) clearInterval(animationIntervalId.current);
+                 if (animationIntervalId.current) {
+                    clearInterval(animationIntervalId.current);
+                    animationIntervalId.current = null;
+                }
                 setLiveData([]);
-                
-                const smartAnimate = () => {
-                    if (dataQueue.length === 0) {
+                let isAnimating = true;
+
+                const animationLoop = () => {
+                    if (dataQueue.length > 0) {
+                        setLiveData(prev => [...prev, dataQueue.shift()!]);
+                    } else if (!isAnimating) {
+                        clearInterval(animationIntervalId.current);
+                        animationIntervalId.current = null;
                         resolve();
-                        return;
                     }
-                    const point = dataQueue.shift();
-                    if (point) {
-                        setLiveData(prev => [...prev, point]);
-                    }
-                    animationIntervalId.current = setTimeout(smartAnimate, 8);
                 };
-                smartAnimate();
+
+                animationIntervalId.current = setInterval(animationLoop, 8);
+
+                // This timeout marks the end of the data source
+                 setTimeout(() => {
+                    isAnimating = false;
+                }, (dataQueue.length * 8) + 100); 
+
             });
         };
 
