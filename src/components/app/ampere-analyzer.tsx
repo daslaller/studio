@@ -41,6 +41,8 @@ const formSchema = z.object({
 
   // Simulation Constraints
   simulationMode: z.enum(['ftf', 'temp', 'budget']).default('ftf'),
+  simulationAlgorithm: z.enum(['iterative', 'binary']).default('iterative'),
+  precisionSteps: z.coerce.number().min(10).max(5000).default(200),
   switchingFrequency: z.coerce.number().positive(), // kHz
   coolingMethod: z.string().min(1, 'Please select a cooling method'),
   ambientTemperature: z.coerce.number().default(25),
@@ -133,6 +135,8 @@ export default function AmpereAnalyzer() {
       ambientTemperature: 25,
       transistorType: 'MOSFET (N-Channel)',
       simulationMode: 'ftf',
+      simulationAlgorithm: 'iterative',
+      precisionSteps: 200,
     },
   });
   
@@ -243,7 +247,8 @@ export default function AmpereAnalyzer() {
     const {
       maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
       switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
-      transistorType, rdsOn, vceSat, simulationMode, coolingBudget
+      transistorType, rdsOn, vceSat, simulationMode, coolingBudget,
+      simulationAlgorithm, precisionSteps,
     } = values;
 
     const selectedCooling = coolingMethods.find(c => c.value === coolingMethod) as CoolingMethod;
@@ -287,30 +292,7 @@ export default function AmpereAnalyzer() {
         };
     };
 
-    // Binary search for the maximum safe current
-    let low = 0;
-    let high = maxCurrent * 1.5; // Search slightly above max current to find true thermal limit
-    let maxSafeCurrent = 0;
-    
-    for (let i = 0; i < 20; i++) { // 20 iterations are enough for high precision
-        let mid = (low + high) / 2;
-        if (mid <= 0) break;
-        const result = checkCurrent(mid);
-        if (result.isSafe) {
-            maxSafeCurrent = mid;
-            low = mid;
-        } else {
-            high = mid;
-        }
-    }
-    
-    const finalResult = checkCurrent(maxSafeCurrent);
-
-    // Generate live data for the chart display after finding the result
-    const dataPoints: LiveDataPoint[] = [];
-    const steps = 100;
-    for (let i = 0; i <= steps; i++) {
-        const current = (maxSafeCurrent / steps) * i;
+    const addDataPoint = (current: number) => {
         const pointResult = checkCurrent(current);
         const { isSafe, ...rest } = pointResult;
         
@@ -335,7 +317,7 @@ export default function AmpereAnalyzer() {
                 break;
         }
         
-        dataPoints.push({
+        const newDataPoint: LiveDataPoint = {
             current,
             temperature: rest.finalTemperature,
             powerLoss: rest.powerDissipation.total,
@@ -343,9 +325,55 @@ export default function AmpereAnalyzer() {
             switchingLoss: rest.powerDissipation.switching,
             progress: Math.min(progress, 100),
             limitValue
+        };
+        
+        updateCallback((prev) => [...prev, newDataPoint]);
+    };
+    
+    let maxSafeCurrent = 0;
+    
+    if (simulationAlgorithm === 'iterative') {
+        const stepSize = (maxCurrent * 1.2) / precisionSteps;
+        for (let i = 0; i <= precisionSteps; i++) {
+            const current = i * stepSize;
+            const result = checkCurrent(current);
+            if (result.isSafe) {
+                maxSafeCurrent = current;
+                addDataPoint(current);
+                 await new Promise(resolve => setTimeout(resolve, 5)); // Small delay for rendering
+            } else {
+                break; // Stop iterating once a failure is detected
+            }
+        }
+    } else { // Binary Search
+        let low = 0;
+        let high = maxCurrent * 1.5; // Search slightly above max current to find true thermal limit
+        
+        for (let i = 0; i < 15; i++) { // 15 iterations are enough for high precision
+            let mid = (low + high) / 2;
+            if (mid <= 0) break;
+            const result = checkCurrent(mid);
+            addDataPoint(mid);
+            await new Promise(resolve => setTimeout(resolve, 50)); // Delay to visualize search
+            if (result.isSafe) {
+                maxSafeCurrent = mid;
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        // Final cleanup for live data - sort and add zero point
+        updateCallback(prev => {
+            const sorted = [...prev].sort((a,b) => a.current - b.current);
+            if (sorted.length === 0 || sorted[0].current > 0) {
+              addDataPoint(0);
+              return [checkCurrent(0), ...sorted].map(p => ({ ...p, current: p.current, temperature: p.temperature, powerLoss: p.powerLoss, conductionLoss: p.conductionLoss, switchingLoss: p.switchingLoss, progress: p.progress, limitValue: p.limitValue }));
+            }
+            return sorted;
         });
     }
-    updateCallback(dataPoints);
+
+    const finalResult = checkCurrent(maxSafeCurrent);
 
     const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
     const finalCheck = checkCurrent(safeCurrent);

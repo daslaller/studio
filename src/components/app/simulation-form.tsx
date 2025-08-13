@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Loader2, Upload, SlidersHorizontal, Package, Thermometer, Zap, ShieldAlert, Search } from 'lucide-react';
+import { Loader2, Upload, SlidersHorizontal, Package, Thermometer, Zap, ShieldAlert, Search, Info, Bot } from 'lucide-react';
 import React from 'react';
 import { coolingMethods, predefinedTransistors, transistorTypes } from '@/lib/constants';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -58,6 +58,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
     const selectedCoolingMethod = coolingMethods.find(m => m.value === form.watch('coolingMethod'));
     const currentTransistorType = form.watch('transistorType');
     const simulationMode = form.watch('simulationMode');
+    const simulationAlgorithm = form.watch('simulationAlgorithm');
 
   return (
     <Form {...form}>
@@ -318,34 +319,85 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
 
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-primary"/> Simulation End Condition</CardTitle>
-                <CardDescription>Choose what limit will stop the simulation.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-primary"/> Simulation Engine</CardTitle>
+                <CardDescription>Choose the algorithm and failure conditions.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <FormField
+                 <FormField
+                    control={form.control}
+                    name="simulationAlgorithm"
+                    render={({ field }) => (
+                        <FormItem>
+                           <FormLabel>Algorithm</FormLabel>
+                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                               <FormItem className="flex items-center space-x-2 space-y-0">
+                                   <FormControl><RadioGroupItem value="iterative" id="iterative" /></FormControl>
+                                   <FormLabel htmlFor="iterative" className="font-normal cursor-pointer">Iterative</FormLabel>
+                               </FormItem>
+                               <FormItem className="flex items-center space-x-2 space-y-0">
+                                   <FormControl><RadioGroupItem value="binary" id="binary" /></FormControl>
+                                   <FormLabel htmlFor="binary" className="font-normal cursor-pointer">Binary Search</FormLabel>
+                               </FormItem>
+                            </RadioGroup>
+                             <FormDescription className="flex items-center gap-1.5 pt-1">
+                                <Info className="h-3 w-3" />
+                                Iterative is slower but shows a smooth graph. Binary Search is near-instant.
+                            </FormDescription>
+                        </FormItem>
+                    )}
+                />
+                 
+                <AnimatePresence>
+                {simulationAlgorithm === 'iterative' && (
+                     <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                         <FormField
+                            control={form.control}
+                            name="precisionSteps"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Precision (Steps)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 200" {...field} value={field.value ?? ''} /></FormControl>
+                                    <FormDescription>Higher steps improve visual precision but reduce performance.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </motion.div>
+                )}
+                </AnimatePresence>
+
+                 <FormField
                     control={form.control}
                     name="simulationMode"
                     render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-3 gap-x-2 gap-y-2">
-                           <FormItem className="flex flex-col items-center space-y-2">
-                               <FormLabel htmlFor="ftf" className="font-normal cursor-pointer text-xs whitespace-nowrap">First-To-Fail</FormLabel>
-                               <FormControl>
-                                   <RadioGroupItem value="ftf" id="ftf" />
-                               </FormControl>
-                           </FormItem>
-                           <FormItem className="flex flex-col items-center space-y-2">
-                               <FormLabel htmlFor="temp" className="font-normal cursor-pointer text-xs whitespace-nowrap">Temp Limit</FormLabel>
-                               <FormControl>
-                                   <RadioGroupItem value="temp" id="temp" />
-                               </FormControl>
-                           </FormItem>
-                           <FormItem className="flex flex-col items-center space-y-2">
-                                <FormLabel htmlFor="budget" className="font-normal cursor-pointer text-xs whitespace-nowrap">Cooling Budget</FormLabel>
-                               <FormControl>
-                                   <RadioGroupItem value="budget" id="budget" />
-                               </FormControl>
-                           </FormItem>
-                        </RadioGroup>
+                       <FormItem>
+                            <FormLabel>End Condition</FormLabel>
+                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-3 gap-x-2 gap-y-2">
+                               <FormItem className="flex flex-col items-center space-y-2">
+                                   <FormLabel htmlFor="ftf" className="font-normal cursor-pointer text-xs whitespace-nowrap">First-To-Fail</FormLabel>
+                                   <FormControl>
+                                       <RadioGroupItem value="ftf" id="ftf" />
+                                   </FormControl>
+                               </FormItem>
+                               <FormItem className="flex flex-col items-center space-y-2">
+                                   <FormLabel htmlFor="temp" className="font-normal cursor-pointer text-xs whitespace-nowrap">Temp Limit</FormLabel>
+                                   <FormControl>
+                                       <RadioGroupItem value="temp" id="temp" />
+                                   </FormControl>
+                               </FormItem>
+                               <FormItem className="flex flex-col items-center space-y-2">
+                                    <FormLabel htmlFor="budget" className="font-normal cursor-pointer text-xs whitespace-nowrap">Cooling Budget</FormLabel>
+                                   <FormControl>
+                                       <RadioGroupItem value="budget" id="budget" />
+                                   </FormControl>
+                               </FormItem>
+                            </RadioGroup>
+                       </FormItem>
                     )}
                 />
                  
