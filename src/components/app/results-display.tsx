@@ -126,6 +126,22 @@ export default function ResultsDisplay({
         </CardContent>
       </Card>
 
+       {liveData && liveData.length > 0 && formValues.simulationAlgorithm === 'iterative' && (
+         <Card>
+           <CardHeader>
+             <CardTitle>Analysis Graph</CardTitle>
+             <CardDescription>Live plot of the iterative simulation.</CardDescription>
+           </CardHeader>
+           <CardContent>
+              <LiveSimulationView 
+                liveData={liveData} 
+                simulationMode={formValues.simulationMode}
+                maxTemperature={formValues.maxTemperature}
+              />
+           </CardContent>
+         </Card>
+      )}
+
       {aiCalculatedResults && (
         <Card>
           <CardHeader>
@@ -172,3 +188,5 @@ export default function ResultsDisplay({
     </div>
   );
 }
+
+    

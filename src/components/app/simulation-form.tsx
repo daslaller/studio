@@ -341,7 +341,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                             </RadioGroup>
                              <FormDescription className="flex items-center gap-1.5 pt-1">
                                 <Info className="h-3 w-3" />
-                                Iterative is slower but shows a smooth graph. Binary Search is near-instant.
+                                Iterative is visual but slower. Binary Search is faster.
                             </FormDescription>
                         </FormItem>
                     )}
@@ -362,7 +362,7 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                                 <FormItem>
                                     <FormLabel>Precision (Steps)</FormLabel>
                                     <FormControl><Input type="number" placeholder="e.g., 200" {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormDescription>Higher steps improve visual precision but reduce performance.</FormDescription>
+                                    <FormDescription>Higher steps (max 500) improve visual precision but reduce performance.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}

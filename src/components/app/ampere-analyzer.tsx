@@ -42,7 +42,7 @@ const formSchema = z.object({
   // Simulation Constraints
   simulationMode: z.enum(['ftf', 'temp', 'budget']).default('ftf'),
   simulationAlgorithm: z.enum(['iterative', 'binary']).default('iterative'),
-  precisionSteps: z.coerce.number().min(10).max(5000).default(200),
+  precisionSteps: z.coerce.number().min(10).max(500).default(200),
   switchingFrequency: z.coerce.number().positive(), // kHz
   coolingMethod: z.string().min(1, 'Please select a cooling method'),
   ambientTemperature: z.coerce.number().default(25),
@@ -340,8 +340,9 @@ export default function AmpereAnalyzer() {
             if (result.isSafe) {
                 maxSafeCurrent = current;
                 addDataPoint(current);
-                 await new Promise(resolve => setTimeout(resolve, 5)); // Small delay for rendering
+                 await new Promise(resolve => setTimeout(resolve, 10)); // Small delay for rendering
             } else {
+                addDataPoint(current); // Add the failing point for visualization
                 break; // Stop iterating once a failure is detected
             }
         }
@@ -365,31 +366,39 @@ export default function AmpereAnalyzer() {
         // Final cleanup for live data - sort and add zero point
         updateCallback(prev => {
             const sorted = [...prev].sort((a,b) => a.current - b.current);
-            if (sorted.length === 0 || sorted[0].current > 0) {
-              addDataPoint(0);
-              return [checkCurrent(0), ...sorted].map(p => ({ ...p, current: p.current, temperature: p.temperature, powerLoss: p.powerLoss, conductionLoss: p.conductionLoss, switchingLoss: p.switchingLoss, progress: p.progress, limitValue: p.limitValue }));
+             if (sorted.length > 0 && sorted[0].current > 0) {
+                const zeroPointResult = checkCurrent(0);
+                const zeroDataPoint: LiveDataPoint = {
+                    current: 0,
+                    temperature: zeroPointResult.finalTemperature,
+                    powerLoss: zeroPointResult.powerDissipation.total,
+                    conductionLoss: zeroPointResult.powerDissipation.conduction,
+                    switchingLoss: zeroPointResult.powerDissipation.switching,
+                    progress: 0,
+                    limitValue: 0,
+                }
+                return [zeroDataPoint, ...sorted];
             }
             return sorted;
         });
     }
 
-    const finalResult = checkCurrent(maxSafeCurrent);
-
-    const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
-    const finalCheck = checkCurrent(safeCurrent);
-    if (finalCheck.isSafe) {
+    const finalCheck = checkCurrent(maxSafeCurrent);
+    if (!finalCheck.isSafe) {
+         return {
+            status: 'failure',
+            maxSafeCurrent: maxSafeCurrent,
+            ...finalCheck
+        };
+    } else {
+        const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);
+        const cappedFinalCheck = checkCurrent(safeCurrent);
         return {
             status: 'success',
             maxSafeCurrent: safeCurrent,
             failureReason: null,
-            details: `Device operates safely up to its max rating of ${safeCurrent.toFixed(2)}A within all limits.`,
-            ...finalCheck
-        };
-    } else {
-         return {
-            status: 'failure',
-            maxSafeCurrent: safeCurrent,
-            ...finalCheck
+            details: `Device operates safely up to ${safeCurrent.toFixed(2)}A within all limits.`,
+            ...cappedFinalCheck
         };
     }
 };
@@ -397,12 +406,17 @@ export default function AmpereAnalyzer() {
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
+      // Clear all previous results immediately
       setIsDeepDiveRunning(false);
       setSimulationResult(null);
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
       setLiveData([]);
       scrollToResults();
+      
+      // Add a small delay to ensure the UI has time to clear before simulation starts
+      await new Promise(resolve => setTimeout(resolve, 50));
+
 
       const componentName = values.predefinedComponent 
         ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
@@ -427,7 +441,7 @@ export default function AmpereAnalyzer() {
         .join(', ');
 
 
-      const simulationSummary = `Result: ${simResult.status}. Failure Reason: ${simResult.failureReason || 'None'}. Details: ${simResult.details}`;
+      const simulationSummary = `Result: ${simResult.status}. Max Safe Current: ${simResult.maxSafeCurrent.toFixed(2)}A. Failure Reason: ${simResult.failureReason || 'None'}. Details: ${simResult.details}`;
       const selectedCooling = coolingMethods.find(c => c.value === values.coolingMethod);
       const coolingBudgetVal = values.simulationMode === 'budget' && values.coolingBudget ? values.coolingBudget : (selectedCooling?.coolingBudget || 0);
       
@@ -467,7 +481,7 @@ export default function AmpereAnalyzer() {
       const combinedValues = { ...initialValues, ...newValues };
       const simResult = await runSimulation(combinedValues, updateCallback);
       return simResult;
-  }, [runSimulation]);
+  }, []);
 
   const handleAiDeepDive = useCallback(async () => {
     if (!simulationResult || !aiOptimizationSuggestions) {
@@ -736,7 +750,5 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
-
-    
 
     
