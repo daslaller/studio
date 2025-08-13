@@ -251,8 +251,7 @@ export default function AmpereAnalyzer() {
  const runSimulation = (
     values: FormValues,
     updateCallback?: (data: LiveDataPoint[]) => void
-  ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
-    return new Promise((resolve) => {
+  ): { result: SimulationResult, dataQueue: LiveDataPoint[] } => {
         const {
         maxCurrent, maxVoltage, powerDissipation, rthJC, riseTime, fallTime,
         switchingFrequency, maxTemperature, ambientTemperature, coolingMethod,
@@ -355,40 +354,29 @@ export default function AmpereAnalyzer() {
                     break; // Stop at first failure
                 }
             }
-            resolve({ result: buildResult(), dataQueue });
 
         } else { // Binary Search
             let low = 0;
             let high = maxCurrent * 1.5; 
             
-            const runBinarySearch = async () => {
-                for (let i = 0; i < 15; i++) {
-                    let mid = (low + high) / 2;
-                    if (mid <= 0) break;
-                    const result = checkCurrent(mid);
-                    addDataPoint(mid, dataQueue);
-                    
-                    if (updateCallback) {
-                        updateCallback([...dataQueue].sort((a, b) => a.current - b.current));
-                        await new Promise(r => setTimeout(r, 50)); 
-                    }
+            for (let i = 0; i < 15; i++) { // 15 steps is enough for high precision
+                let mid = (low + high) / 2;
+                if (mid <= 0) break;
+                const result = checkCurrent(mid);
+                addDataPoint(mid, dataQueue);
 
-                    if (result.isSafe) {
-                        maxSafeCurrent = mid;
-                        low = mid;
-                    } else {
-                        high = mid;
-                    }
+                if (result.isSafe) {
+                    maxSafeCurrent = mid;
+                    low = mid;
+                } else {
+                    high = mid;
                 }
-                if (updateCallback) {
-                    updateCallback(dataQueue.sort((a,b) => a.current - b.current));
-                }
-                resolve({ result: buildResult(), dataQueue });
-            };
-            runBinarySearch();
+            }
+            // Sort data for clean graphing
+            dataQueue.sort((a,b) => a.current - b.current);
         }
 
-        function buildResult(): SimulationResult {
+        const buildResult = (): SimulationResult => {
             const finalCheck = checkCurrent(maxSafeCurrent);
             if (!finalCheck.isSafe) {
                 if (maxSafeCurrent === 0) {
@@ -419,7 +407,7 @@ export default function AmpereAnalyzer() {
                 };
             }
         }
-    });
+        return { result: buildResult(), dataQueue };
   };
 
 
@@ -435,9 +423,6 @@ export default function AmpereAnalyzer() {
       setLiveData([]);
       scrollToResults();
       
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-
       const componentName = values.predefinedComponent 
         ? predefinedTransistors.find(t => t.value === values.predefinedComponent)?.name || 'N/A'
         : values.componentName || 'N/A';
@@ -446,24 +431,21 @@ export default function AmpereAnalyzer() {
         toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please populate component specs before running an analysis.' });
         return;
       }
-
-      const { result: simResult, dataQueue } = await runSimulation(values);
       
-      if (values.simulationAlgorithm === 'iterative') {
-          let i = 0;
-          animationIntervalRef.current = setInterval(() => {
-              if (i < dataQueue.length) {
-                  setLiveData(prev => [...prev, dataQueue[i]]);
-                  i++;
-              } else {
-                  if(animationIntervalRef.current) clearInterval(animationIntervalRef.current);
-              }
-          }, 8); // 8ms for smooth animation
-      } else {
-          setLiveData(dataQueue.sort((a,b) => a.current - b.current));
-      }
-      
+      // Run the synchronous calculation
+      const { result: simResult, dataQueue } = runSimulation(values);
       setSimulationResult(simResult);
+
+      // Animate the results from the queue
+      let i = 0;
+      animationIntervalRef.current = setInterval(() => {
+          if (i < dataQueue.length) {
+              setLiveData(prev => [...prev, dataQueue[i]]);
+              i++;
+          } else {
+              if(animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+          }
+      }, 8);
 
       let specsForAi: Partial<ManualSpecs> = {
           maxCurrent: String(values.maxCurrent),
@@ -508,19 +490,14 @@ export default function AmpereAnalyzer() {
     });
   };
 
-  const runDeepDiveSimulation = useCallback(async (
+  const runDeepDiveSimulation = useCallback((
       initialValues: FormValues,
       newValues: Partial<FormValues>
   ) => {
       const combinedValues = { ...initialValues, ...newValues };
-      // For deep dive, we don't need the animated callback for binary search
-      const updateCallback = combinedValues.simulationAlgorithm === 'binary' ? setLiveData : undefined;
-      const { result, dataQueue } = await runSimulation(combinedValues, updateCallback);
-      
-      if (combinedValues.simulationAlgorithm === 'iterative') {
-          return { result, dataQueue };
-      }
-      return { result, dataQueue: dataQueue.sort((a,b) => a.current - b.current) };
+      // Deep dive always runs synchronously and returns the full data queue for animation
+      const { result, dataQueue } = runSimulation(combinedValues);
+      return { result, dataQueue };
   }, []);
 
   const handleAiDeepDive = useCallback(async () => {
@@ -629,13 +606,13 @@ export default function AmpereAnalyzer() {
             const step = simulationSteps[i];
 
             if(step.simulationResult === null && Object.keys(step.simulationParams).length > 0) {
-                const { result: stepSimResult, dataQueue } = await runDeepDiveSimulation(values, step.simulationParams);
+                const { result: stepSimResult, dataQueue } = runDeepDiveSimulation(values, step.simulationParams);
                 simulationSteps[i].simulationResult = stepSimResult;
                 setDeepDiveSteps([...simulationSteps]);
                 await animateSimulationData(dataQueue);
                 
             } else if (step.simulationResult) {
-                 const { dataQueue } = await runDeepDiveSimulation(values, {});
+                 const { dataQueue } = runDeepDiveSimulation(values, {});
                  await animateSimulationData(dataQueue);
             }
 
