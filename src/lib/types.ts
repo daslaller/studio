@@ -60,7 +60,7 @@ export type AiDeepDiveAnalysisInput = z.infer<typeof AiDeepDiveAnalysisInputSche
 export const AiDeepDiveAnalysisOutputSchema = z.object({
     bestCoolingMethod: z.string().describe("The 'value' for the optimal cooling method found (e.g., 'air-nh-d15')."),
     optimalFrequency: z.number().describe("The suggested optimal switching frequency in kHz."),
-    reasoning: z.string().describe("Detailed reasoning for why these new parameters are optimal, explaining the step-by-step thought process."),
+    reasoning: z.string().describe("Detailed reasoning for why these new parameters are optimal, explaining the step-by-step thought process and extreme indepth analyses made to optimize the performance of the power transistor."),
     projectedMaxSafeCurrent: z.number().describe("The new projected max safe current in Amps with these changes."),
 });
 export type AiDeepDiveAnalysisOutput = z.infer<typeof AiDeepDiveAnalysisOutputSchema>;

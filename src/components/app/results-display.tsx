@@ -1,11 +1,10 @@
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, LiveDataPoint, AiDeepDiveStep } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2, AlertTriangle, Thermometer, Zap, Gauge, Lightbulb, Bot, Cpu, TrendingUp, Power, Package, ShieldAlert, BrainCircuit } from 'lucide-react';
-import React from "react";
+import React, { useEffect, useState } from "react";
 import LiveSimulationView from "./live-simulation-view";
 import { Button } from "../ui/button";
 import AiDeepDiveView from "./ai-deep-dive-view";
@@ -23,16 +22,76 @@ interface ResultsDisplayProps {
   currentDeepDiveStep: number;
 }
 
-const ResultMetric = ({ icon, label, value, unit, colorClass = 'text-primary' }: { icon: React.ElementType, label: string, value: string | number, unit: string, colorClass?: string }) => (
-    <div className="flex items-start space-x-3 rounded-lg p-4 bg-white/5 transition-all hover:bg-white/10">
-        <div className="flex-shrink-0 mt-1">
-            {React.createElement(icon, { className: `h-6 w-6 ${colorClass}` })}
-        </div>
-        <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-xl font-bold">{value} <span className="text-sm font-normal text-muted-foreground">{unit}</span></p>
-        </div>
+// NEW: Add SmoothCounter component
+const SmoothCounter = ({ 
+  value, 
+  duration = 300, 
+  decimals = 1 
+}: { 
+  value: number; 
+  duration?: number; 
+  decimals?: number;
+}) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  const easeInOutQuad = (t: number): number => {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  };
+  
+  useEffect(() => {
+    const startValue = displayValue;
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeInOutQuad(progress);
+      
+      const interpolatedValue = startValue + (value - startValue) * easedProgress;
+      setDisplayValue(interpolatedValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [value, duration]);
+  
+  return <span>{displayValue.toFixed(decimals)}</span>;
+};
+
+// UPDATED: Enhanced ResultMetric component with smooth animations
+const ResultMetric = ({ 
+  icon, 
+  label, 
+  value, 
+  unit, 
+  colorClass = 'text-primary',
+  animate = false
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  value: string | number; 
+  unit: string; 
+  colorClass?: string;
+  animate?: boolean;
+}) => (
+  <div className="flex items-start space-x-3 rounded-lg p-4 bg-white/5 transition-all hover:bg-white/10">
+    <div className="flex-shrink-0 mt-1">
+      {React.createElement(icon, { className: `h-6 w-6 ${colorClass}` })}
     </div>
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-xl font-bold">
+        {animate && typeof value === 'number' ? (
+          <SmoothCounter value={value} decimals={2} />
+        ) : (
+          value
+        )} <span className="text-sm font-normal text-muted-foreground">{unit}</span>
+      </p>
+    </div>
+  </div>
 );
 
 export default function ResultsDisplay({ 
@@ -116,12 +175,70 @@ export default function ResultsDisplay({
             <AlertTitle className="font-bold">{isSuccess ? 'Analysis Successful' : `Failure: ${simulationResult.failureReason} Limit Reached`}</AlertTitle>
             <AlertDescription>{simulationResult.details}</AlertDescription>
           </Alert>
+
+          {/* UPDATED: Enhanced main score display with smooth animation */}
+          <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg p-6 text-center">
+            <div className="text-sm text-green-300 mb-2">MAXIMUM SAFE CURRENT</div>
+            <div className="text-6xl font-bold text-green-400">
+              <SmoothCounter 
+                value={simulationResult?.maxSafeCurrent || 0} 
+                duration={800}
+                decimals={1}
+              />
+            </div>
+            <div className="text-xl text-green-300 mt-2">Amperes</div>
+          </div>
+
+          {/* UPDATED: Grid with smooth animated metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <ResultMetric icon={Gauge} label="Max Safe Current" value={simulationResult.maxSafeCurrent.toFixed(2)} unit="A" colorClass="text-green-400" />
-            <ResultMetric icon={Thermometer} label="Final Junction Temp" value={simulationResult.finalTemperature.toFixed(2)} unit="°C" colorClass="text-orange-400" />
-            <ResultMetric icon={Power} label="Total Heat Generation" value={simulationResult.powerDissipation.total.toFixed(2)} unit="W" colorClass="text-red-400"/>
-            <ResultMetric icon={Cpu} label="Conduction Loss" value={simulationResult.powerDissipation.conduction.toFixed(2)} unit="W" />
-            <ResultMetric icon={TrendingUp} label="Switching Loss" value={simulationResult.powerDissipation.switching.toFixed(2)} unit="W" />
+            <ResultMetric 
+              icon={Thermometer} 
+              label="Final Junction Temp" 
+              value={simulationResult.finalTemperature} 
+              unit="°C" 
+              colorClass="text-orange-400"
+              animate={true}
+            />
+            <ResultMetric 
+              icon={Power} 
+              label="Total Heat Generation" 
+              value={simulationResult.powerDissipation.total} 
+              unit="W" 
+              colorClass="text-red-400"
+              animate={true}
+            />
+            <ResultMetric 
+              icon={Cpu} 
+              label="Conduction Loss" 
+              value={simulationResult.powerDissipation.conduction} 
+              unit="W"
+              animate={true}
+            />
+            <ResultMetric 
+              icon={TrendingUp} 
+              label="Switching Loss" 
+              value={simulationResult.powerDissipation.switching} 
+              unit="W"
+              animate={true}
+            />
+            {/* NEW: Live current display if data is available */}
+            {liveData.length > 0 && (
+              <div className="flex items-start space-x-3 rounded-lg p-4 bg-white/5 transition-all hover:bg-white/10">
+                <div className="flex-shrink-0 mt-1">
+                  <Gauge className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Current Analysis</p>
+                  <p className="text-xl font-bold">
+                    <SmoothCounter 
+                      value={liveData[liveData.length - 1]?.current || 0} 
+                      decimals={1}
+                      duration={100}
+                    /> <span className="text-sm font-normal text-muted-foreground">A</span>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -155,8 +272,20 @@ export default function ResultsDisplay({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <ResultMetric icon={Gauge} label="Expected Max Current" value={aiCalculatedResults.expectedMaxCurrent.toFixed(2)} unit="A" />
-                <ResultMetric icon={Thermometer} label="Expected Max Temp" value={aiCalculatedResults.expectedMaxTemperature.toFixed(2)} unit="°C" />
+                <ResultMetric 
+                  icon={Gauge} 
+                  label="Expected Max Current" 
+                  value={aiCalculatedResults.expectedMaxCurrent} 
+                  unit="A"
+                  animate={true}
+                />
+                <ResultMetric 
+                  icon={Thermometer} 
+                  label="Expected Max Temp" 
+                  value={aiCalculatedResults.expectedMaxTemperature} 
+                  unit="°C"
+                  animate={true}
+                />
             </div>
             <div className="p-4 bg-white/5 rounded-lg">
                 <p className="text-sm text-muted-foreground italic"><strong className="text-foreground not-italic">AI Reasoning:</strong> {aiCalculatedResults.reasoning}</p>

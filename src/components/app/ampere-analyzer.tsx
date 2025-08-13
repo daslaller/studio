@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
@@ -10,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
 import { findDatasheetAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction, extractSpecsFromDatasheetAction, getBestEffortSpecsAction } from '@/app/actions';
-import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput, GetBestEffortSpecsOutput } from '@/lib/types';
+import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, InterpolatedDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput, GetBestEffortSpecsOutput } from '@/lib/types';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import HistoryView from './history-view';
@@ -91,6 +89,11 @@ export default function AmpereAnalyzer() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
+  // NEW: Add smooth interpolation state
+  const [rawDataBuffer, setRawDataBuffer] = useState<LiveDataPoint[]>([]);
+  const [smoothDataStream, setSmoothDataStream] = useState<InterpolatedDataPoint[]>([]);
+  const smoothAnimationRef = useRef<number | null>(null);
+
   const animationIntervalId = useRef<any>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   
@@ -103,11 +106,103 @@ export default function AmpereAnalyzer() {
     } catch (error) {
         console.error("Could not load history from localStorage", error);
     }
-    // Cleanup interval on component unmount
+    // UPDATED: Cleanup both intervals on component unmount
     return () => {
       if(animationIntervalId.current) clearInterval(animationIntervalId.current);
+      if(smoothAnimationRef.current) cancelAnimationFrame(smoothAnimationRef.current);
     }
   }, []);
+
+  // NEW: Add smooth interpolation utility functions
+  const easeInOutQuad = useCallback((t: number): number => {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  }, []);
+
+  const interpolateDataPoint = useCallback((
+    from: LiveDataPoint, 
+    to: LiveDataPoint, 
+    progress: number
+  ): InterpolatedDataPoint => {
+    const easedProgress = easeInOutQuad(Math.max(0, Math.min(1, progress)));
+    
+    return {
+      current: from.current + (to.current - from.current) * easedProgress,
+      temperature: from.temperature + (to.temperature - from.temperature) * easedProgress,
+      powerLoss: from.powerLoss + (to.powerLoss - from.powerLoss) * easedProgress,
+      conductionLoss: from.conductionLoss + (to.conductionLoss - from.conductionLoss) * easedProgress,
+      switchingLoss: from.switchingLoss + (to.switchingLoss - from.switchingLoss) * easedProgress,
+      progress: from.progress + (to.progress - from.progress) * easedProgress,
+      limitValue: to.limitValue,
+      isInterpolated: true,
+      timestamp: performance.now()
+    };
+  }, [easeInOutQuad]);
+
+  // NEW: Add smooth animation controller
+  const startSmoothAnimation = useCallback(() => {
+    let currentKeyframe = 0;
+    let keyframeStartTime = performance.now();
+    const INTERPOLATION_DURATION = 120; // ms between keyframes
+
+    const smoothAnimationLoop = (currentTime: number) => {
+      if (rawDataBuffer.length < 2) {
+        smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
+        return;
+      }
+
+      // Calculate interpolation progress
+      const timeSinceKeyframeStart = currentTime - keyframeStartTime;
+      const interpolationProgress = Math.min(timeSinceKeyframeStart / INTERPOLATION_DURATION, 1);
+
+      // Get current keyframe pair
+      const fromPoint = rawDataBuffer[Math.max(0, currentKeyframe - 1)] || rawDataBuffer[0];
+      const toPoint = rawDataBuffer[currentKeyframe] || rawDataBuffer[rawDataBuffer.length - 1];
+
+      // Generate smooth interpolated point
+      const interpolatedPoint = interpolateDataPoint(fromPoint, toPoint, interpolationProgress);
+
+      // Update smooth data stream
+      setSmoothDataStream(prev => {
+        const newStream = [...prev];
+        
+        // Replace last interpolated point or add new one
+        if (newStream.length > 0 && newStream[newStream.length - 1].isInterpolated) {
+          newStream[newStream.length - 1] = interpolatedPoint;
+        } else {
+          newStream.push(interpolatedPoint);
+        }
+        
+        // Prevent memory bloat - keep last 400 points
+        return newStream.slice(-400);
+      });
+
+      // Move to next keyframe when interpolation is complete
+      if (interpolationProgress >= 1 && currentKeyframe < rawDataBuffer.length - 1) {
+        currentKeyframe++;
+        keyframeStartTime = currentTime;
+        
+        // Add the actual calculated point as a keyframe
+        const actualPoint: InterpolatedDataPoint = {
+          ...toPoint,
+          isInterpolated: false,
+          timestamp: currentTime
+        };
+        
+        setSmoothDataStream(prev => [...prev, actualPoint]);
+      }
+
+      smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
+    };
+
+    smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
+  }, [rawDataBuffer, interpolateDataPoint]);
+
+  // NEW: Effect to start smooth animation when rawDataBuffer changes
+  useEffect(() => {
+    if (rawDataBuffer.length >= 2 && !smoothAnimationRef.current) {
+      startSmoothAnimation();
+    }
+  }, [rawDataBuffer, startSmoothAnimation]);
 
   const addToHistory = (entry: HistoryEntry) => {
     const newHistory = [entry, ...history].slice(0, 50); // Keep last 50 results
@@ -430,15 +525,23 @@ export default function AmpereAnalyzer() {
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
+      // UPDATED: Cleanup both intervals
       if (animationIntervalId.current) {
         clearInterval(animationIntervalId.current);
         animationIntervalId.current = null;
+      }
+      if (smoothAnimationRef.current) {
+        cancelAnimationFrame(smoothAnimationRef.current);
+        smoothAnimationRef.current = null;
       }
 
       setSimulationResult(null);
       setAiCalculatedResults(null);
       setAiOptimizationSuggestions(null);
+      // UPDATED: Clear both data streams
       setLiveData([]);
+      setRawDataBuffer([]);
+      setSmoothDataStream([]);
       scrollToResults();
       
       const componentName = values.predefinedComponent 
@@ -457,14 +560,16 @@ export default function AmpereAnalyzer() {
           dataQueue.push(newDataPoint);
       };
       
+      // UPDATED: Modified animation loop to feed raw buffer instead of liveData
       const animationLoop = () => {
         if (dataQueue.length > 0) {
             const pointToRender = values.simulationAlgorithm === 'binary' 
-                ? dataQueue.shift()! // For binary, render as they come
-                : dataQueue.splice(0, Math.max(1, Math.floor(dataQueue.length / 10))).pop()!; // For iterative, skip frames to keep up
+                ? dataQueue.shift()! 
+                : dataQueue.splice(0, Math.max(1, Math.floor(dataQueue.length / 10))).pop()!;
 
             if (pointToRender) {
-                setLiveData(prev => {
+                // CHANGED: Feed raw data buffer instead of liveData
+                setRawDataBuffer(prev => {
                     const newData = [...prev, pointToRender];
                     if (values.simulationAlgorithm === 'binary') {
                         return newData.sort((a,b) => a.current - b.current);
@@ -482,10 +587,21 @@ export default function AmpereAnalyzer() {
       
       animationIntervalId.current = setInterval(animationLoop, 8);
 
+      // NEW: Start smooth interpolation animation
+      startSmoothAnimation();
+
       const simResult = await runSimulation(values, updateCallback);
       
       isSimulationRunning = false;
       setSimulationResult(simResult);
+
+      // NEW: Continue smooth animation briefly after simulation ends
+      setTimeout(() => {
+        if (smoothAnimationRef.current) {
+          cancelAnimationFrame(smoothAnimationRef.current);
+          smoothAnimationRef.current = null;
+        }
+      }, 500);
 
       let specsForAi: Partial<ManualSpecs> = {
           maxCurrent: String(values.maxCurrent),
@@ -817,7 +933,16 @@ export default function AmpereAnalyzer() {
                         simulationResult={simulationResult}
                         aiCalculatedResults={aiCalculatedResults}
                         aiOptimizationSuggestions={aiOptimizationSuggestions}
-                        liveData={liveData}
+                        // UPDATED: Pass smooth data stream converted to LiveDataPoint format
+                        liveData={smoothDataStream.map(point => ({
+                          current: point.current,
+                          temperature: point.temperature,
+                          powerLoss: point.powerLoss,
+                          conductionLoss: point.conductionLoss,
+                          switchingLoss: point.switchingLoss,
+                          progress: point.progress,
+                          limitValue: point.limitValue
+                        }))}
                         formValues={form.getValues()}
                         onAiDeepDive={handleAiDeepDive}
                         isDeepDiveRunning={isDeepDiveRunning}
