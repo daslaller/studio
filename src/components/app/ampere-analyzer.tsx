@@ -250,7 +250,7 @@ export default function AmpereAnalyzer() {
 
  const runSimulation = (
     values: FormValues,
-    updateCallback: (data: LiveDataPoint[]) => void
+    updateCallback?: (data: LiveDataPoint[]) => void
   ): Promise<{ result: SimulationResult, dataQueue: LiveDataPoint[] }> => {
     return new Promise((resolve) => {
         const {
@@ -368,8 +368,10 @@ export default function AmpereAnalyzer() {
                     const result = checkCurrent(mid);
                     addDataPoint(mid, dataQueue);
                     
-                    updateCallback([...dataQueue].sort((a, b) => a.current - b.current));
-                    await new Promise(r => setTimeout(r, 50)); 
+                    if (updateCallback) {
+                        updateCallback([...dataQueue].sort((a, b) => a.current - b.current));
+                        await new Promise(r => setTimeout(r, 50)); 
+                    }
 
                     if (result.isSafe) {
                         maxSafeCurrent = mid;
@@ -378,7 +380,9 @@ export default function AmpereAnalyzer() {
                         high = mid;
                     }
                 }
-                updateCallback(dataQueue.sort((a,b) => a.current - b.current));
+                if (updateCallback) {
+                    updateCallback(dataQueue.sort((a,b) => a.current - b.current));
+                }
                 resolve({ result: buildResult(), dataQueue });
             };
             runBinarySearch();
@@ -443,7 +447,7 @@ export default function AmpereAnalyzer() {
         return;
       }
 
-      const { result: simResult, dataQueue } = await runSimulation(values, setLiveData);
+      const { result: simResult, dataQueue } = await runSimulation(values);
       
       if (values.simulationAlgorithm === 'iterative') {
           let i = 0;
@@ -506,12 +510,17 @@ export default function AmpereAnalyzer() {
 
   const runDeepDiveSimulation = useCallback(async (
       initialValues: FormValues,
-      newValues: Partial<FormValues>,
-      updateCallback: (data: LiveDataPoint[]) => void
+      newValues: Partial<FormValues>
   ) => {
       const combinedValues = { ...initialValues, ...newValues };
-      const { result } = await runSimulation(combinedValues, updateCallback);
-      return result;
+      // For deep dive, we don't need the animated callback for binary search
+      const updateCallback = combinedValues.simulationAlgorithm === 'binary' ? setLiveData : undefined;
+      const { result, dataQueue } = await runSimulation(combinedValues, updateCallback);
+      
+      if (combinedValues.simulationAlgorithm === 'iterative') {
+          return { result, dataQueue };
+      }
+      return { result, dataQueue: dataQueue.sort((a,b) => a.current - b.current) };
   }, []);
 
   const handleAiDeepDive = useCallback(async () => {
@@ -526,6 +535,7 @@ export default function AmpereAnalyzer() {
         setDeepDiveSteps([]);
         setLiveData([]);
         scrollToResults();
+        if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
 
         const values = form.getValues();
         const componentName = values.predefinedComponent
@@ -595,26 +605,38 @@ export default function AmpereAnalyzer() {
         
         setDeepDiveSteps(simulationSteps);
 
+        // This function will animate a single simulation's data
+        const animateSimulationData = (dataQueue: LiveDataPoint[]) => {
+            return new Promise<void>((resolve) => {
+                if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+                setLiveData([]);
+                let i = 0;
+                animationIntervalRef.current = setInterval(() => {
+                    if (i < dataQueue.length) {
+                        setLiveData(prev => [...prev, dataQueue[i]]);
+                        i++;
+                    } else {
+                        if (animationIntervalRef.current) clearInterval(animationIntervalRef.current);
+                        resolve();
+                    }
+                }, 8);
+            });
+        };
+
         // Run through steps
         for(let i = 0; i < simulationSteps.length; i++) {
             setCurrentDeepDiveStep(i);
             const step = simulationSteps[i];
 
             if(step.simulationResult === null && Object.keys(step.simulationParams).length > 0) {
-                // To show a clean slate for the new simulation, clear liveData before running
-                setLiveData([]);
-                await new Promise(r => setTimeout(r, 100)); // small delay to clear chart
-
-                const stepSimResult = await runDeepDiveSimulation(values, step.simulationParams, setLiveData);
+                const { result: stepSimResult, dataQueue } = await runDeepDiveSimulation(values, step.simulationParams);
                 simulationSteps[i].simulationResult = stepSimResult;
                 setDeepDiveSteps([...simulationSteps]);
-                await new Promise(r => setTimeout(r, 1000)); // Pause to let user see results
+                await animateSimulationData(dataQueue);
+                
             } else if (step.simulationResult) {
-                 // Re-run simulation for the initial state to show the graph
-                 setLiveData([]);
-                 await new Promise(r => setTimeout(r, 100));
-                 await runDeepDiveSimulation(values, {}, setLiveData);
-                 await new Promise(r => setTimeout(r, 1000));
+                 const { dataQueue } = await runDeepDiveSimulation(values, {});
+                 await animateSimulationData(dataQueue);
             }
 
             if(i < simulationSteps.length -1) {
@@ -781,3 +803,5 @@ export default function AmpereAnalyzer() {
     </div>
   );
 }
+
+    
