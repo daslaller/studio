@@ -336,7 +336,6 @@ export default function AmpereAnalyzer() {
         
         if (simulationAlgorithm === 'iterative') {
             const stepSize = (maxCurrent * 1.2) / precisionSteps;
-            const updateInterval = Math.max(1, Math.floor(precisionSteps / 50)); // Update UI ~50 times
             
             let i = 0;
             const runIteration = () => {
@@ -347,25 +346,22 @@ export default function AmpereAnalyzer() {
                 if (result.isSafe) {
                     maxSafeCurrent = current;
                 } else {
-                    // Stop iterating once a failure is detected
                     updateCallback([...localLiveData]); // Final update
                     resolve(buildResult());
                     return;
                 }
                 
-                if (i % updateInterval === 0) {
-                    updateCallback([...localLiveData]);
-                }
+                updateCallback([...localLiveData]);
 
                 i++;
                 if (i <= precisionSteps) {
-                    requestAnimationFrame(runIteration);
+                     setTimeout(runIteration, 8);
                 } else {
                     updateCallback([...localLiveData]); // Final update
                     resolve(buildResult());
                 }
             };
-            requestAnimationFrame(runIteration);
+            runIteration(); // Starts the loop
             return; // Resolve will be called inside runIteration
         } else { // Binary Search
             let low = 0;
@@ -395,10 +391,22 @@ export default function AmpereAnalyzer() {
         function buildResult(): SimulationResult {
             const finalCheck = checkCurrent(maxSafeCurrent);
             if (!finalCheck.isSafe) {
+                // This can happen if the very first step is unsafe
+                if (maxSafeCurrent === 0) {
+                     return {
+                        status: 'failure',
+                        maxSafeCurrent: 0,
+                        failureReason: finalCheck.failureReason,
+                        details: `Component fails even at 0A. ${finalCheck.details}`,
+                        finalTemperature: finalCheck.finalTemperature,
+                        powerDissipation: finalCheck.powerDissipation,
+                    };
+                }
+                const resultAtFailure = checkCurrent(maxSafeCurrent);
                 return {
                     status: 'failure',
                     maxSafeCurrent: maxSafeCurrent,
-                    ...finalCheck
+                    ...resultAtFailure
                 };
             } else {
                 const safeCurrent = Math.min(maxSafeCurrent, maxCurrent);

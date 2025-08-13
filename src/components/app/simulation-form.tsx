@@ -341,7 +341,10 @@ export default function SimulationForm({ form, onSubmit, isPending, onTransistor
                             </RadioGroup>
                              <FormDescription className="flex items-center gap-1.5 pt-1">
                                 <Info className="h-3 w-3" />
-                                Iterative provides a live visual of the calculation process.
+                                {simulationAlgorithm === 'iterative' 
+                                    ? "Provides a live visualization of the calculation process."
+                                    : "Quickly finds the limit with a live 'go-high, go-low' view."
+                                }
                             </FormDescription>
                         </FormItem>
                     )}
