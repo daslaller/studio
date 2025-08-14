@@ -55,7 +55,7 @@ const prompt = ai.definePrompt({
   5.  **Output Format**: Provide the result strictly in the JSON format. Do not include any other text or explanation outside of the JSON structure.
 
   The Zod schema descriptions are:
-  ${JSON.stringify(GetBestEffortSpecsOutputSchema.describe())}`,
+  ${JSON.stringify(GetBestEffortSpecsOutputSchema.describe("Output schema for transistor specifications"))}`,
 });
 
 

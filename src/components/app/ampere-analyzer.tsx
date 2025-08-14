@@ -9,6 +9,7 @@ import SimulationForm from '@/components/app/simulation-form';
 import ResultsDisplay from '@/components/app/results-display';
 import { findDatasheetAction, getAiCalculationsAction, getAiSuggestionsAction, runAiDeepDiveAction, extractSpecsFromDatasheetAction, getBestEffortSpecsAction } from '@/app/actions';
 import type { SimulationResult, AiCalculatedExpectedResultsOutput, AiOptimizationSuggestionsOutput, CoolingMethod, ManualSpecs, LiveDataPoint, InterpolatedDataPoint, AiDeepDiveAnalysisInput, AiDeepDiveStep, HistoryEntry, FindDatasheetOutput, ExtractTransistorSpecsOutput, GetBestEffortSpecsOutput } from '@/lib/types';
+import { OptimizedDataQueue, CircularDataBuffer, EasingInterpolator, throttle, hasSignificantChange } from '@/lib/simulation-optimizations';
 import { coolingMethods, predefinedTransistors } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import HistoryView from './history-view';
@@ -49,7 +50,7 @@ const formSchema = z.object({
   // FTF Limits
   coolingBudget: z.coerce.number().optional(),
 
-}).superRefine((data: { componentName: any; predefinedComponent: any; transistorType: string; rdsOn: number; vceSat: number; simulationMode: string; coolingBudget: number; }, ctx: { addIssue: (arg0: { code: any; path: string[]; message: string; }) => void; }) => {
+}).superRefine((data, ctx) => {
     if (!data.componentName && !data.predefinedComponent) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['componentName'], message: 'Device name is required if not selecting a predefined one.' });
     }
@@ -82,15 +83,16 @@ export default function AmpereAnalyzer() {
   const [aiCalculatedResults, setAiCalculatedResults] = useState<AiCalculatedExpectedResultsOutput | null>(null);
   const [aiOptimizationSuggestions, setAiOptimizationSuggestions] = useState<AiOptimizationSuggestionsOutput | null>(null);
   const [datasheetFile, setDatasheetFile] = useState<File | null>(null);
-  const [liveData, setLiveData] = useState<LiveDataPoint[]>([]);
   const [isDeepDiveRunning, setIsDeepDiveRunning] = useState(false);
   const [deepDiveSteps, setDeepDiveSteps] = useState<AiDeepDiveStep[]>([]);
   const [currentDeepDiveStep, setCurrentDeepDiveStep] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [dialogState, setDialogState] = useState<DialogState>({ type: 'idle' });
 
-  // NEW: Add smooth interpolation state
-  const [rawDataBuffer, setRawDataBuffer] = useState<LiveDataPoint[]>([]);
+  // OPTIMIZED: Replace arrays with efficient data structures
+  const dataBuffer = useRef(new CircularDataBuffer(400));
+  const interpolator = useRef(new EasingInterpolator());
+  const [renderTrigger, setRenderTrigger] = useState(0);
   const [smoothDataStream, setSmoothDataStream] = useState<InterpolatedDataPoint[]>([]);
   const smoothAnimationRef = useRef<number | null>(null);
 
@@ -106,46 +108,33 @@ export default function AmpereAnalyzer() {
     } catch (error) {
         console.error("Could not load history from localStorage", error);
     }
-    // UPDATED: Cleanup both intervals on component unmount
+    
+    // OPTIMIZED: Comprehensive cleanup on component unmount
     return () => {
-      if(animationIntervalId.current) clearInterval(animationIntervalId.current);
-      if(smoothAnimationRef.current) cancelAnimationFrame(smoothAnimationRef.current);
+      if (animationIntervalId.current) {
+        clearInterval(animationIntervalId.current);
+        animationIntervalId.current = null;
+      }
+      if (smoothAnimationRef.current) {
+        cancelAnimationFrame(smoothAnimationRef.current);
+        smoothAnimationRef.current = null;
+      }
+      // Clear data structures
+      dataBuffer.current.clear();
     }
   }, []);
 
-  // NEW: Add smooth interpolation utility functions
-  const easeInOutQuad = useCallback((t: number): number => {
-    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-  }, []);
 
-  const interpolateDataPoint = useCallback((
-    from: LiveDataPoint, 
-    to: LiveDataPoint, 
-    progress: number
-  ): InterpolatedDataPoint => {
-    const easedProgress = easeInOutQuad(Math.max(0, Math.min(1, progress)));
-    
-    return {
-      current: from.current + (to.current - from.current) * easedProgress,
-      temperature: from.temperature + (to.temperature - from.temperature) * easedProgress,
-      powerLoss: from.powerLoss + (to.powerLoss - from.powerLoss) * easedProgress,
-      conductionLoss: from.conductionLoss + (to.conductionLoss - from.conductionLoss) * easedProgress,
-      switchingLoss: from.switchingLoss + (to.switchingLoss - from.switchingLoss) * easedProgress,
-      progress: from.progress + (to.progress - from.progress) * easedProgress,
-      limitValue: to.limitValue,
-      isInterpolated: true,
-      timestamp: performance.now()
-    };
-  }, [easeInOutQuad]);
-
-  // NEW: Add smooth animation controller
+  // OPTIMIZED: Enhanced smooth animation using efficient data structures
   const startSmoothAnimation = useCallback(() => {
-    let currentKeyframe = 0;
     let keyframeStartTime = performance.now();
     const INTERPOLATION_DURATION = 120; // ms between keyframes
 
     const smoothAnimationLoop = (currentTime: number) => {
-      if (rawDataBuffer.length < 2) {
+      const currentPoint = dataBuffer.current.getCurrent();
+      const previousPoint = dataBuffer.current.getPrevious();
+      
+      if (!currentPoint || !previousPoint) {
         smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
         return;
       }
@@ -154,15 +143,15 @@ export default function AmpereAnalyzer() {
       const timeSinceKeyframeStart = currentTime - keyframeStartTime;
       const interpolationProgress = Math.min(timeSinceKeyframeStart / INTERPOLATION_DURATION, 1);
 
-      // Get current keyframe pair
-      const fromPoint = rawDataBuffer[Math.max(0, currentKeyframe - 1)] || rawDataBuffer[0];
-      const toPoint = rawDataBuffer[currentKeyframe] || rawDataBuffer[rawDataBuffer.length - 1];
+      // Generate smooth interpolated point using optimized interpolator
+      const interpolatedPoint = interpolator.current.interpolate(
+        previousPoint, 
+        currentPoint, 
+        interpolationProgress
+      );
 
-      // Generate smooth interpolated point
-      const interpolatedPoint = interpolateDataPoint(fromPoint, toPoint, interpolationProgress);
-
-      // Update smooth data stream
-      setSmoothDataStream((prev: any) => {
+      // OPTIMIZED: More efficient state update
+      setSmoothDataStream((prev) => {
         const newStream = [...prev];
         
         // Replace last interpolated point or add new one
@@ -172,37 +161,36 @@ export default function AmpereAnalyzer() {
           newStream.push(interpolatedPoint);
         }
         
-        // Prevent memory bloat - keep last 400 points
-        return newStream.slice(-400);
+        // Memory management - keep last 200 points for smooth display
+        return newStream.slice(-200);
       });
 
-      // Move to next keyframe when interpolation is complete
-      if (interpolationProgress >= 1 && currentKeyframe < rawDataBuffer.length - 1) {
-        currentKeyframe++;
+      // Reset timing when new data arrives
+      if (interpolationProgress >= 1) {
         keyframeStartTime = currentTime;
         
         // Add the actual calculated point as a keyframe
         const actualPoint: InterpolatedDataPoint = {
-          ...toPoint,
+          ...currentPoint,
           isInterpolated: false,
           timestamp: currentTime
         };
         
-        setSmoothDataStream((prev: any) => [...prev, actualPoint]);
+        setSmoothDataStream((prev) => [...prev.slice(-199), actualPoint]);
       }
 
       smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
     };
 
     smoothAnimationRef.current = requestAnimationFrame(smoothAnimationLoop);
-  }, [rawDataBuffer, interpolateDataPoint]);
+  }, []);
 
-  // NEW: Effect to start smooth animation when rawDataBuffer changes
+  // OPTIMIZED: Start animation based on render trigger instead of data length
   useEffect(() => {
-    if (rawDataBuffer.length >= 2 && !smoothAnimationRef.current) {
+    if (renderTrigger > 0 && !smoothAnimationRef.current) {
       startSmoothAnimation();
     }
-  }, [rawDataBuffer, startSmoothAnimation]);
+  }, [renderTrigger, startSmoothAnimation]);
 
   const addToHistory = (entry: HistoryEntry) => {
     const newHistory = [entry, ...history].slice(0, 50); // Keep last 50 results
@@ -394,10 +382,10 @@ export default function AmpereAnalyzer() {
   
 
 
-// 3. SIMPLIFIED: Your onSubmit function becomes much cleaner
+// OPTIMIZED: Your 8ms queue system enhanced with efficient data structures
 const onSubmit = (values: FormValues) => {
   startTransition(async () => {
-    // Cleanup existing animations (same as before)
+    // Cleanup existing animations
     if (animationIntervalId.current) {
       clearInterval(animationIntervalId.current);
       animationIntervalId.current = null;
@@ -410,9 +398,9 @@ const onSubmit = (values: FormValues) => {
     setSimulationResult(null);
     setAiCalculatedResults(null);
     setAiOptimizationSuggestions(null);
-    setLiveData([]);
-    setRawDataBuffer([]);
     setSmoothDataStream([]);
+    dataBuffer.current.clear(); // Clear efficient buffer
+    setRenderTrigger(0);
     scrollToResults();
     
     const componentName = values.predefinedComponent 
@@ -424,42 +412,48 @@ const onSubmit = (values: FormValues) => {
       return;
     }
     
-    // SIMPLIFIED: Your existing queue system works perfectly
-    const dataQueue: LiveDataPoint[] = [];
+    // PRESERVED: Your brilliant 8ms queue system with optimization wrapper
+    const optimizedQueue = new OptimizedDataQueue();
     let isSimulationRunning = true;
 
     const updateCallback = (newDataPoint: LiveDataPoint) => {
-      dataQueue.push(newDataPoint); // Worker sends data here
+      optimizedQueue.enqueue(newDataPoint); // Worker feeds optimized queue
     };
     
-    // Your existing 8ms queue check - UNCHANGED!
+    // ENHANCED: Your 8ms loop with memory-efficient processing
     const animationLoop = () => {
-      if (dataQueue.length > 0) {
-        const pointToRender = values.simulationAlgorithm === 'binary' 
-          ? dataQueue.shift()! 
-          : dataQueue.splice(0, Math.max(1, Math.floor(dataQueue.length / 10))).pop()!;
+      const currentTime = performance.now();
+      const pointToRender = optimizedQueue.dequeue(values.simulationAlgorithm, currentTime);
 
-        if (pointToRender) {
-          setRawDataBuffer((prev: any) => {
-            const newData = [...prev, pointToRender];
-            if (values.simulationAlgorithm === 'binary') {
-              return newData.sort((a,b) => a.current - b.current);
-            }
-            return newData;
-          });
+      if (pointToRender) {
+        // OPTIMIZED: Use circular buffer instead of growing arrays
+        dataBuffer.current.add(pointToRender);
+        
+        // Binary algorithm still sorts as needed
+        if (values.simulationAlgorithm === 'binary') {
+          // For binary, we need sorted display data
+          const currentData = dataBuffer.current.getDisplayData();
+          currentData.sort((a, b) => a.current - b.current);
+          // Update buffer with sorted data
+          dataBuffer.current.clear();
+          currentData.forEach(point => dataBuffer.current.add(point));
         }
+        
+        // Trigger efficient re-render
+        setRenderTrigger(prev => prev + 1);
       }
 
-      if (!isSimulationRunning && dataQueue.length === 0) {
+      if (!isSimulationRunning && optimizedQueue.length === 0) {
         clearInterval(animationIntervalId.current);
         animationIntervalId.current = null;
       }
     };
     
-    animationIntervalId.current = setInterval(animationLoop, 8); // Your optimized 8ms!
-    startSmoothAnimation(); // Your smooth interpolation!
+    // PRESERVED: Your optimized 8ms timing!
+    animationIntervalId.current = setInterval(animationLoop, 8);
+    startSmoothAnimation(); // Enhanced smooth interpolation
 
-    // WEB WORKER MAGIC: Pure parallel calculation
+    // Web Worker simulation (unchanged)
     const simResult = await runSimulation(values, updateCallback);
     
     isSimulationRunning = false;
@@ -473,7 +467,36 @@ const onSubmit = (values: FormValues) => {
       }
     }, 500);
 
-    // ... rest of your AI calculations stay the same
+    // Add to history with optimization
+    const historyEntry: HistoryEntry = {
+      id: new Date().toISOString(),
+      componentName,
+      timestamp: new Date().toISOString(),
+      simulationResult: simResult,
+      formValues: values,
+    };
+    addToHistory(historyEntry);
+
+    // AI calculations (unchanged)
+    if (simResult.status === 'success') {
+      const aiCalculations = await getAiCalculationsAction(
+        componentName,
+        `Max Current: ${simResult.maxSafeCurrent}A, Max Voltage: ${values.maxVoltage}V, Type: ${values.transistorType}`
+      );
+
+      if (aiCalculations.data) setAiCalculatedResults(aiCalculations.data);
+
+      const selectedCooling = coolingMethods.find(c => c.value === values.coolingMethod);
+      const aiSuggestions = await getAiSuggestionsAction(
+        componentName,
+        selectedCooling?.name || 'Unknown',
+        values.maxTemperature,
+        selectedCooling?.coolingBudget || 0,
+        `${simResult.status}: ${simResult.details}`
+      );
+
+      if (aiSuggestions.data) setAiOptimizationSuggestions(aiSuggestions.data);
+    }
   });
 };
   const runDeepDiveSimulation = useCallback(async (
@@ -488,7 +511,7 @@ const onSubmit = (values: FormValues) => {
         }).then(resolve);
       });
       return { result, dataQueue };
-  }, [runSimulation]);
+  }, []);
 
   const handleAiDeepDive = useCallback(async () => {
     if (!simulationResult || !aiOptimizationSuggestions) {
@@ -500,7 +523,8 @@ const onSubmit = (values: FormValues) => {
         setIsDeepDiveRunning(true);
         setCurrentDeepDiveStep(0);
         setDeepDiveSteps([]);
-        setLiveData([]);
+        dataBuffer.current.clear();
+        setRenderTrigger(0);
         scrollToResults();
         if (animationIntervalId.current) clearInterval(animationIntervalId.current);
 
@@ -572,19 +596,22 @@ const onSubmit = (values: FormValues) => {
         
         setDeepDiveSteps(simulationSteps);
 
-        // This function will animate a single simulation's data
+        // OPTIMIZED: Animate simulation data using efficient buffer
         const animateSimulationData = (dataQueue: LiveDataPoint[]) => {
             return new Promise<void>((resolve) => {
                  if (animationIntervalId.current) {
                     clearInterval(animationIntervalId.current);
                     animationIntervalId.current = null;
                 }
-                setLiveData([]);
+                dataBuffer.current.clear();
+                setRenderTrigger(0);
                 let isAnimating = true;
 
                 const animationLoop = () => {
                     if (dataQueue.length > 0) {
-                        setLiveData((prev: any) => [...prev, dataQueue.shift()!]);
+                        const point = dataQueue.shift()!;
+                        dataBuffer.current.add(point);
+                        setRenderTrigger(prev => prev + 1);
                     } else if (!isAnimating) {
                         clearInterval(animationIntervalId.current);
                         animationIntervalId.current = null;
@@ -763,8 +790,8 @@ const onSubmit = (values: FormValues) => {
                         simulationResult={simulationResult}
                         aiCalculatedResults={aiCalculatedResults}
                         aiOptimizationSuggestions={aiOptimizationSuggestions}
-                        // UPDATED: Pass smooth data stream converted to LiveDataPoint format
-                        liveData={smoothDataStream.map((point: { current: any; temperature: any; powerLoss: any; conductionLoss: any; switchingLoss: any; progress: any; limitValue: any; }) => ({
+                        // OPTIMIZED: Use smooth interpolated data for display
+                        liveData={smoothDataStream.map((point): LiveDataPoint => ({
                           current: point.current,
                           temperature: point.temperature,
                           powerLoss: point.powerLoss,

@@ -44,7 +44,7 @@ const prompt = ai.definePrompt({
   - reasoning: Your reasoning behind the calculated results. Explain what parameters in the datasheet were most important.
   Be conservative when estimating, err on the side of caution.
   Make sure to output a valid JSON according to the schema.  The Zod schema descriptions are:
-  ${JSON.stringify(AiCalculatedExpectedResultsOutputSchema.describe())}`,
+  ${JSON.stringify(AiCalculatedExpectedResultsOutputSchema.describe("AI calculated expected results"))}`,
 });
 
 const aiCalculateExpectedResultsFlow = ai.defineFlow(

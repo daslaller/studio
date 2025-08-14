@@ -113,7 +113,7 @@ export default function AiDeepDiveView({ steps, currentStepIndex, liveData, init
                 
                 {/* Live simulation view for the current step */}
                 <div className="flex-grow">
-                   <AnimatePresence mode="out-in">
+                   <AnimatePresence mode="wait">
                         <motion.div
                             key={key}
                             initial={{ opacity: 0, scale: 0.95 }}
