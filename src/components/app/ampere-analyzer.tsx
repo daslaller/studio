@@ -348,8 +348,8 @@ export default function AmpereAnalyzer() {
       const rdsOnOhms = (rdsOn || 0) / 1000;
       const effectiveCoolingBudget = (simulationMode === 'budget' && coolingBudget) ? coolingBudget : selectedCooling.coolingBudget;
   
-      // Create Web Worker
-      const worker = new Worker('/simulation-worker.js');
+      // Create Web Worker (Windsurf/Next.js compatible)
+      const worker = new Worker(new URL('../../lib/simulation.worker.js', import.meta.url));
       
       // Handle messages from worker
       worker.onmessage = (e) => {
